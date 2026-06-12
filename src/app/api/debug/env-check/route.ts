@@ -27,6 +27,26 @@ export async function GET() {
     .eq("status", "pending")
     .order("created_at", { ascending: false });
 
+  // Simple columns + order only (isolate .order()).
+  const { data: orderOnlyData, error: orderOnlyError } = await supabase
+    .from("flagged_items")
+    .select("id, status, client_id, clients(name)")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  // Full columns, no order (isolate extra columns).
+  const { data: fullNoOrderData, error: fullNoOrderError } = await supabase
+    .from("flagged_items")
+    .select("id, platform, author_name, original_text, ai_analysis, created_at, clients(name)")
+    .eq("status", "pending");
+
+  // Full columns minus ai_analysis, with order (isolate ai_analysis jsonb column).
+  const { data: noAiAnalysisData, error: noAiAnalysisError } = await supabase
+    .from("flagged_items")
+    .select("id, platform, author_name, original_text, created_at, clients(name)")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
   return NextResponse.json({
     supabaseUrl: url,
     serviceKeyPreview: keyPreview,
@@ -37,6 +57,18 @@ export async function GET() {
       error: pageError ? pageError.message : null,
       rowCount: pageData?.length ?? null,
       data: pageData,
+    },
+    orderOnly: {
+      error: orderOnlyError ? orderOnlyError.message : null,
+      rowCount: orderOnlyData?.length ?? null,
+    },
+    fullNoOrder: {
+      error: fullNoOrderError ? fullNoOrderError.message : null,
+      rowCount: fullNoOrderData?.length ?? null,
+    },
+    noAiAnalysis: {
+      error: noAiAnalysisError ? noAiAnalysisError.message : null,
+      rowCount: noAiAnalysisData?.length ?? null,
     },
   });
 }
