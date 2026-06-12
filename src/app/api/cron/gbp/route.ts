@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { analyzeComment } from "@/lib/ai";
+import { analyzeCommentsBatch } from "@/lib/ai";
 import { listReviews, replyToReview } from "@/lib/gbp";
 import type { ClientConfig } from "@/lib/types";
 
@@ -50,6 +50,8 @@ export async function GET(req: NextRequest) {
         20
       );
 
+      // Pass 1: figure out which reviews are actually new — no AI calls yet.
+      const newReviews: typeof reviews = [];
       for (const review of reviews) {
         if (review.hasReply) continue;
         if (!review.comment) continue; // star-only reviews with no text — skip auto-analysis
@@ -63,8 +65,17 @@ export async function GET(req: NextRequest) {
           .maybeSingle();
 
         if (existing) continue;
+        newReviews.push(review);
+      }
 
-        const analysis = await analyzeComment(review.comment, client.ai_instructions);
+      // Pass 2: one Gemini call for ALL of this client's new reviews.
+      const analyses = await analyzeCommentsBatch(
+        newReviews.map((r) => ({ id: r.reviewId, text: r.comment })),
+        client.ai_instructions
+      );
+
+      for (const review of newReviews) {
+        const analysis = analyses.get(review.reviewId)!;
 
         // Extra guardrail specific to reviews: only auto-post replies to
         // 4-5 star reviews. Anything 3 stars or below always goes to a human,

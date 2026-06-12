@@ -1,0 +1,30 @@
+import { supabase } from "@/lib/supabase";
+import { NextResponse } from "next/server";
+
+// TEMPORARY DEBUG ROUTE — remove before onboarding real clients (see task #16).
+// Visit /api/debug/env-check on the deployed site to see (masked) env values
+// and the live result of the Review Queue query.
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const url = process.env.SUPABASE_URL ?? null;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+  const keyPreview = key
+    ? `${key.slice(0, 14)}...${key.slice(-4)} (len ${key.length})`
+    : null;
+
+  const { data, error } = await supabase
+    .from("flagged_items")
+    .select("id, status, client_id, clients(name)")
+    .eq("status", "pending");
+
+  return NextResponse.json({
+    supabaseUrl: url,
+    serviceKeyPreview: keyPreview,
+    queryError: error ? error.message : null,
+    rowCount: data?.length ?? null,
+    data,
+  });
+}

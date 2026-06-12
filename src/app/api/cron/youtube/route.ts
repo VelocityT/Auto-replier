@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { analyzeComment } from "@/lib/ai";
+import { analyzeCommentsBatch } from "@/lib/ai";
 import { listRecentComments, replyToComment } from "@/lib/youtube";
 import type { ClientConfig } from "@/lib/types";
 
@@ -43,6 +43,8 @@ export async function GET(req: NextRequest) {
         20
       );
 
+      // Pass 1: figure out which comments are actually new — no AI calls yet.
+      const newComments: typeof comments = [];
       for (const comment of comments) {
         const { data: existing } = await supabase
           .from("processed_items")
@@ -53,8 +55,17 @@ export async function GET(req: NextRequest) {
           .maybeSingle();
 
         if (existing) continue;
+        newComments.push(comment);
+      }
 
-        const analysis = await analyzeComment(comment.text, client.ai_instructions);
+      // Pass 2: one Gemini call for ALL of this client's new comments.
+      const analyses = await analyzeCommentsBatch(
+        newComments.map((c) => ({ id: c.commentId, text: c.text })),
+        client.ai_instructions
+      );
+
+      for (const comment of newComments) {
+        const analysis = analyses.get(comment.commentId)!;
 
         if (analysis.shouldAutoReply && analysis.reply) {
           await replyToComment(comment.commentId, analysis.reply, client.youtube_refresh_token!);
