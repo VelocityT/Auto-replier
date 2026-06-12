@@ -13,6 +13,15 @@ export type Intent =
   | "spam"
   | "other";
 
+// A lightweight pointer to the post/video/media a comment belongs to.
+// null for platforms where comments aren't tied to a specific post
+// (e.g. Google Business Profile reviews are location-level).
+export interface PostRef {
+  id: string;
+  label: string; // human-readable label shown on the dashboard
+  url: string | null; // deep link to the post/video, if we can construct one
+}
+
 export interface AiAnalysis {
   language: "hindi" | "english" | "hinglish" | "other";
   sentiment: Sentiment;
@@ -56,6 +65,7 @@ export interface ProcessedItem {
   platform: Platform;
   external_id: string; // comment ID / review ID from the platform
   status: "auto_replied" | "flagged" | "ignored";
+  post_ref: PostRef | null;
   created_at: string;
 }
 
@@ -69,5 +79,7 @@ export interface FlaggedItem {
   original_text: string;
   ai_analysis: AiAnalysis;
   status: "pending" | "approved" | "rejected" | "posted";
+  post_ref: PostRef | null;
   created_at: string;
+  updated_at: string;
 }

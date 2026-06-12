@@ -90,6 +90,7 @@ async function handleCommentEvent(event: ReturnType<typeof parseWebhookEvents>[n
       platform: event.platform,
       external_id: event.commentId,
       status: "auto_replied",
+      post_ref: event.postRef,
     });
   } else {
     await supabase.from("flagged_items").insert({
@@ -100,6 +101,7 @@ async function handleCommentEvent(event: ReturnType<typeof parseWebhookEvents>[n
       original_text: event.text,
       ai_analysis: analysis,
       status: "pending",
+      post_ref: event.postRef,
     });
 
     await supabase.from("processed_items").insert({
@@ -107,6 +109,7 @@ async function handleCommentEvent(event: ReturnType<typeof parseWebhookEvents>[n
       platform: event.platform,
       external_id: event.commentId,
       status: "flagged",
+      post_ref: event.postRef,
     });
   }
 }

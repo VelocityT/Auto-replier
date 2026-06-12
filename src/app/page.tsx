@@ -19,6 +19,15 @@ export default async function HomePage() {
 
   return (
     <div className="container">
+      <nav className="top-nav">
+        <a href="/" className="nav-link active">
+          Review Queue
+        </a>
+        <a href="/dashboard" className="nav-link">
+          Dashboard
+        </a>
+      </nav>
+
       <h1>Review Queue</h1>
       <p className="subtitle">
         Negative, urgent, or low-confidence comments &amp; reviews wait here for a quick

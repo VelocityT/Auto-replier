@@ -83,6 +83,8 @@ export async function GET(req: NextRequest) {
         const starNum = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 }[review.starRating] ?? 0;
         const safeToAutoReply = analysis.shouldAutoReply && starNum >= 4;
 
+        // GBP reviews are location-level — there's no "post" to attribute
+        // them to, so post_ref is always null for this platform.
         if (safeToAutoReply && analysis.reply) {
           await replyToReview(review.name, analysis.reply, client.gbp_refresh_token!);
 
@@ -91,6 +93,7 @@ export async function GET(req: NextRequest) {
             platform: "gbp",
             external_id: review.reviewId,
             status: "auto_replied",
+            post_ref: null,
           });
         } else {
           await supabase.from("flagged_items").insert({
@@ -101,6 +104,7 @@ export async function GET(req: NextRequest) {
             original_text: review.comment,
             ai_analysis: analysis,
             status: "pending",
+            post_ref: null,
           });
 
           await supabase.from("processed_items").insert({
@@ -108,6 +112,7 @@ export async function GET(req: NextRequest) {
             platform: "gbp",
             external_id: review.reviewId,
             status: "flagged",
+            post_ref: null,
           });
         }
 

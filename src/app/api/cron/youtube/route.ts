@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { analyzeCommentsBatch } from "@/lib/ai";
 import { listRecentComments, replyToComment } from "@/lib/youtube";
-import type { ClientConfig } from "@/lib/types";
+import type { ClientConfig, PostRef } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // seconds — Vercel Hobby allows up to 60s on Node functions
@@ -67,6 +67,12 @@ export async function GET(req: NextRequest) {
       for (const comment of newComments) {
         const analysis = analyses.get(comment.commentId)!;
 
+        const postRef: PostRef = {
+          id: comment.videoId,
+          label: "YouTube video",
+          url: `https://www.youtube.com/watch?v=${comment.videoId}`,
+        };
+
         if (analysis.shouldAutoReply && analysis.reply) {
           await replyToComment(comment.commentId, analysis.reply, client.youtube_refresh_token!);
 
@@ -75,6 +81,7 @@ export async function GET(req: NextRequest) {
             platform: "youtube",
             external_id: comment.commentId,
             status: "auto_replied",
+            post_ref: postRef,
           });
         } else {
           await supabase.from("flagged_items").insert({
@@ -85,6 +92,7 @@ export async function GET(req: NextRequest) {
             original_text: comment.text,
             ai_analysis: analysis,
             status: "pending",
+            post_ref: postRef,
           });
 
           await supabase.from("processed_items").insert({
@@ -92,6 +100,7 @@ export async function GET(req: NextRequest) {
             platform: "youtube",
             external_id: comment.commentId,
             status: "flagged",
+            post_ref: postRef,
           });
         }
 

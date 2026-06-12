@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import type { PostRef } from "@/lib/types";
 
 // Instagram + Facebook both go through the Meta Graph API.
 // Comments arrive via webhooks (real-time, no polling needed).
@@ -10,6 +11,9 @@ export interface MetaCommentEvent {
   commentId: string;
   text: string;
   authorName: string | null;
+  // The post/media this comment was left on, when Meta includes it in the
+  // webhook payload. Used for the "which post got comments" dashboard view.
+  postRef: PostRef | null;
 }
 
 /**
@@ -44,12 +48,16 @@ export function parseWebhookEvents(payload: any): MetaCommentEvent[] {
     // Instagram comments
     for (const change of entry.changes ?? []) {
       if (change.field === "comments" && change.value?.id && change.value?.text) {
+        const mediaId: string | undefined = change.value.media?.id;
         events.push({
           platform: "instagram",
           pageOrAccountId: entry.id, // IG business account ID
           commentId: change.value.id,
           text: change.value.text,
           authorName: change.value.from?.username ?? null,
+          postRef: mediaId
+            ? { id: mediaId, label: "Instagram post", url: null }
+            : null,
         });
       }
 
@@ -61,12 +69,16 @@ export function parseWebhookEvents(payload: any): MetaCommentEvent[] {
         change.value?.comment_id &&
         change.value?.message
       ) {
+        const postId: string | undefined = change.value.post_id;
         events.push({
           platform: "facebook",
           pageOrAccountId: entry.id, // FB Page ID
           commentId: change.value.comment_id,
           text: change.value.message,
           authorName: change.value.from?.name ?? null,
+          postRef: postId
+            ? { id: postId, label: "Facebook post", url: `https://www.facebook.com/${postId}` }
+            : null,
         });
       }
     }

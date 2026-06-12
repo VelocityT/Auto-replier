@@ -31,7 +31,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   if (body.action === "reject") {
-    await supabase.from("flagged_items").update({ status: "rejected" }).eq("id", item.id);
+    await supabase
+      .from("flagged_items")
+      .update({ status: "rejected", updated_at: new Date().toISOString() })
+      .eq("id", item.id);
     return NextResponse.json({ ok: true, status: "rejected" });
   }
 
@@ -79,7 +82,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ ok: false, error: `Failed to post reply: ${err.message}` }, { status: 502 });
   }
 
-  await supabase.from("flagged_items").update({ status: "posted" }).eq("id", item.id);
+  await supabase
+    .from("flagged_items")
+    .update({ status: "posted", updated_at: new Date().toISOString() })
+    .eq("id", item.id);
 
   return NextResponse.json({ ok: true, status: "posted" });
 }
