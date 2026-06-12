@@ -20,11 +20,23 @@ export async function GET() {
     .select("id, status, client_id, clients(name)")
     .eq("status", "pending");
 
+  // Exact same query as src/app/page.tsx (Review Queue), for comparison.
+  const { data: pageData, error: pageError } = await supabase
+    .from("flagged_items")
+    .select("id, platform, author_name, original_text, ai_analysis, created_at, clients(name)")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
   return NextResponse.json({
     supabaseUrl: url,
     serviceKeyPreview: keyPreview,
     queryError: error ? error.message : null,
     rowCount: data?.length ?? null,
     data,
+    pageQuery: {
+      error: pageError ? pageError.message : null,
+      rowCount: pageData?.length ?? null,
+      data: pageData,
+    },
   });
 }
