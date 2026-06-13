@@ -82,6 +82,8 @@ export async function GET(req: NextRequest) {
             external_id: comment.commentId,
             status: "auto_replied",
             post_ref: postRef,
+            original_text: comment.text,
+            reply_text: analysis.reply,
           });
         } else {
           await supabase.from("flagged_items").insert({
@@ -101,6 +103,8 @@ export async function GET(req: NextRequest) {
             external_id: comment.commentId,
             status: "flagged",
             post_ref: postRef,
+            original_text: comment.text,
+            reply_text: null,
           });
         }
 

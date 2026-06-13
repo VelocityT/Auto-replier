@@ -94,6 +94,8 @@ export async function GET(req: NextRequest) {
             external_id: review.reviewId,
             status: "auto_replied",
             post_ref: null,
+            original_text: review.comment,
+            reply_text: analysis.reply,
           });
         } else {
           await supabase.from("flagged_items").insert({
@@ -113,6 +115,8 @@ export async function GET(req: NextRequest) {
             external_id: review.reviewId,
             status: "flagged",
             post_ref: null,
+            original_text: review.comment,
+            reply_text: null,
           });
         }
 

@@ -17,6 +17,8 @@ const PLATFORM_ICONS: Record<Platform, string> = {
   gbp: "\u{2B50}",
 };
 
+const PLATFORM_ORDER: Platform[] = ["gbp", "youtube", "instagram", "facebook"];
+
 interface PostStat {
   key: string;
   label: string;
@@ -35,6 +37,12 @@ interface ClientStats {
   posts: PostStat[];
 }
 
+interface PlatformStats {
+  pending: number; // currently awaiting review, right now
+  replied: number; // all-time replies sent (auto + via review queue)
+  total: number; // all-time comments/reviews seen
+}
+
 // "Today" is computed in IST (UTC+5:30) since this app is run for India-based
 // clients — a comment that came in at 11pm IST shouldn't roll into "yesterday".
 function getIstDayRange() {
@@ -50,7 +58,7 @@ function getIstDayRange() {
 export default async function DashboardPage() {
   const { startUTC, endUTC } = getIstDayRange();
 
-  const [clientsRes, processedRes, flaggedRes] = await Promise.all([
+  const [clientsRes, processedRes, flaggedRes, allProcessedRes] = await Promise.all([
     supabase.from("clients").select("*").returns<ClientConfig[]>(),
     supabase
       .from("processed_items")
@@ -59,12 +67,33 @@ export default async function DashboardPage() {
       .lt("created_at", endUTC.toISOString())
       .returns<ProcessedItem[]>(),
     supabase.from("flagged_items").select("*").returns<FlaggedItem[]>(),
+    supabase.from("processed_items").select("platform, status").returns<{ platform: Platform; status: string }[]>(),
   ]);
 
-  const error = clientsRes.error || processedRes.error || flaggedRes.error;
+  const error = clientsRes.error || processedRes.error || flaggedRes.error || allProcessedRes.error;
   const clients = clientsRes.data ?? [];
   const processedToday = processedRes.data ?? [];
   const flaggedAll = flaggedRes.data ?? [];
+  const allProcessed = allProcessedRes.data ?? [];
+
+  // Platform-level snapshot: pending = needs attention right now, replied =
+  // all-time total of comments/reviews we've actually responded to.
+  const platformStats: Record<Platform, PlatformStats> = {
+    instagram: { pending: 0, replied: 0, total: 0 },
+    facebook: { pending: 0, replied: 0, total: 0 },
+    youtube: { pending: 0, replied: 0, total: 0 },
+    gbp: { pending: 0, replied: 0, total: 0 },
+  };
+
+  for (const f of flaggedAll) {
+    if (f.status === "pending") platformStats[f.platform].pending++;
+    if (f.status === "posted") platformStats[f.platform].replied++;
+  }
+
+  for (const p of allProcessed) {
+    platformStats[p.platform].total++;
+    if (p.status === "auto_replied") platformStats[p.platform].replied++;
+  }
 
   // Lookup so we can tell, for an item that was flagged, whether a human
   // approved + posted it (and whether that happened today).
@@ -185,6 +214,32 @@ export default async function DashboardPage() {
         <div className="card">Error loading dashboard: {error.message}</div>
       ) : (
         <>
+          <div className="platform-grid">
+            {PLATFORM_ORDER.map((p) => (
+              <a key={p} href={`/dashboard/${p}`} className={`platform-box platform-box-${p}`}>
+                <div className="platform-box-top">
+                  <span className="platform-box-icon">{PLATFORM_ICONS[p]}</span>
+                  <span className="platform-box-name">{PLATFORM_LABELS[p]}</span>
+                </div>
+                <div className="platform-box-stats">
+                  <div className="platform-box-stat">
+                    <span className="platform-box-stat-value platform-box-stat-pending">
+                      {platformStats[p].pending}
+                    </span>
+                    <span className="platform-box-stat-label">Pending</span>
+                  </div>
+                  <div className="platform-box-stat">
+                    <span className="platform-box-stat-value platform-box-stat-replied">
+                      {platformStats[p].replied}
+                    </span>
+                    <span className="platform-box-stat-label">Replied</span>
+                  </div>
+                </div>
+                <div className="platform-box-footer">View clients &amp; posts →</div>
+              </a>
+            ))}
+          </div>
+
           <div className="summary-row">
             <div className="summary-tile">
               <div className="summary-value">{totals.comments}</div>

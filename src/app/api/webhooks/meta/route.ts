@@ -91,6 +91,8 @@ async function handleCommentEvent(event: ReturnType<typeof parseWebhookEvents>[n
       external_id: event.commentId,
       status: "auto_replied",
       post_ref: event.postRef,
+      original_text: event.text,
+      reply_text: analysis.reply,
     });
   } else {
     await supabase.from("flagged_items").insert({
@@ -110,6 +112,8 @@ async function handleCommentEvent(event: ReturnType<typeof parseWebhookEvents>[n
       external_id: event.commentId,
       status: "flagged",
       post_ref: event.postRef,
+      original_text: event.text,
+      reply_text: null,
     });
   }
 }

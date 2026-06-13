@@ -66,6 +66,8 @@ export interface ProcessedItem {
   external_id: string; // comment ID / review ID from the platform
   status: "auto_replied" | "flagged" | "ignored";
   post_ref: PostRef | null;
+  original_text: string | null; // the comment/review text, for dashboard display
+  reply_text: string | null; // the reply that was actually posted (auto_replied rows only)
   created_at: string;
 }
 

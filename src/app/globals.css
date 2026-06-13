@@ -367,3 +367,201 @@ button:disabled {
   font-size: 13px;
   padding: 16px 0 4px;
 }
+
+/* ───────────────────────────────────────────────
+   Platform overview grid (4 boxes on dashboard)
+   ─────────────────────────────────────────────── */
+
+.platform-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.platform-box {
+  position: relative;
+  display: block;
+  border-radius: 20px;
+  padding: 20px;
+  text-decoration: none;
+  color: #1a1a1a;
+  background: linear-gradient(155deg, #ffffff, #f5f6fa);
+  border: 1px solid #eef0f3;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 14px 30px rgba(16, 24, 40, 0.07);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  overflow: hidden;
+}
+
+.platform-box:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 2px 4px rgba(16, 24, 40, 0.05), 0 20px 40px rgba(16, 24, 40, 0.10);
+}
+
+.platform-box::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  height: 4px;
+}
+
+.platform-box-gbp::before { background: linear-gradient(90deg, #1e7e34, #34a853); }
+.platform-box-youtube::before { background: linear-gradient(90deg, #c0291e, #ff4444); }
+.platform-box-instagram::before { background: linear-gradient(90deg, #c2185b, #e1306c); }
+.platform-box-facebook::before { background: linear-gradient(90deg, #1456c9, #1877f2); }
+
+.platform-box-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.platform-box-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.platform-box-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.platform-box-stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.platform-box-stat {
+  flex: 1;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  padding: 10px 6px;
+  border: 1px solid #eef0f3;
+}
+
+.platform-box-stat-value {
+  display: block;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.platform-box-stat-pending { color: #d97706; }
+.platform-box-stat-replied { color: #1e7e34; }
+
+.platform-box-stat-label {
+  font-size: 11px;
+  color: #888;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.platform-box-footer {
+  font-size: 12px;
+  font-weight: 600;
+  color: #999;
+}
+
+/* ───────────────────────────────────────────────
+   Platform drill-down page (/dashboard/[platform])
+   ─────────────────────────────────────────────── */
+
+.platform-table-wrap {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #eef0f3;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 14px 30px rgba(16, 24, 40, 0.07);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.platform-client-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px 20px;
+  background: linear-gradient(155deg, #ffffff, #f5f6fa);
+  border-bottom: 1px solid #eef0f3;
+}
+
+.platform-client-header h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.platform-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.platform-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #999;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f0f1f3;
+}
+
+.platform-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f6f7f9;
+  vertical-align: top;
+}
+
+.platform-table tr:last-child td {
+  border-bottom: none;
+}
+
+.platform-table .post-link {
+  font-weight: 600;
+  color: #1a1a1a;
+  text-decoration: none;
+}
+
+.platform-table .post-link:hover {
+  text-decoration: underline;
+}
+
+.platform-table .count-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #f3f4f8;
+  color: #555;
+}
+
+.count-pill-pending { background: #fdf0db; color: #b45309; }
+.count-pill-replied { background: #e3f6e6; color: #1e7e34; }
+
+.reply-preview {
+  display: block;
+  max-width: 360px;
+  font-size: 12px;
+  color: #555;
+  white-space: pre-wrap;
+}
+
+.reply-preview-empty {
+  color: #bbb;
+  font-style: italic;
+}
+
+.original-comment {
+  display: block;
+  max-width: 280px;
+  font-size: 12px;
+  color: #777;
+  white-space: pre-wrap;
+  margin-top: 4px;
+}
