@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import TopNav from "@/app/components/TopNav";
 import type { ClientConfig, FlaggedItem, Platform, ProcessedItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -198,14 +199,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="container dashboard">
-      <nav className="top-nav">
-        <a href="/" className="nav-link">
-          Review Queue
-        </a>
-        <a href="/dashboard" className="nav-link active">
-          Dashboard
-        </a>
-      </nav>
+      <TopNav active="dashboard" />
 
       <h1>Dashboard</h1>
       <p className="subtitle">{todayLabel} · across all clients</p>

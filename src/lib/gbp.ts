@@ -76,3 +76,80 @@ export async function replyToReview(
     throw new Error(`GBP reviews.updateReply failed: ${res.status} ${await res.text()}`);
   }
 }
+
+// ─────────────────────────────────────────────
+// Account / location discovery — used by the
+// /api/oauth/gbp connect flow and the location picker.
+//
+// These hit the newer per-resource APIs (account management /
+// business information), which are separate from the v4 "My Business
+// API" used above for reviews. Both require the same `business.manage`
+// scope, but account/location access tends to be granted sooner than
+// full review-management access — so this can succeed even while
+// listReviews/replyToReview are still pending approval (case 7-5896000040841).
+// ─────────────────────────────────────────────
+
+export interface GbpAccount {
+  name: string; // resource name, e.g. "accounts/1234567890"
+  accountName: string; // human-readable
+  type: string;
+}
+
+/**
+ * List the Business Profile accounts accessible to this refresh token.
+ * Throws if the API isn't enabled/approved yet for this project.
+ */
+export async function listAccounts(refreshToken: string): Promise<GbpAccount[]> {
+  const accessToken = await getGoogleAccessToken(refreshToken);
+
+  const res = await fetch("https://mybusinessaccountmanagement.googleapis.com/v1/accounts", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    throw new Error(`GBP accounts.list failed: ${res.status} ${await res.text()}`);
+  }
+
+  const data = await res.json();
+
+  return (data.accounts ?? []).map((a: any) => ({
+    name: a.name,
+    accountName: a.accountName ?? a.name,
+    type: a.type ?? "",
+  }));
+}
+
+export interface GbpLocation {
+  name: string; // resource name, e.g. "accounts/123/locations/456"
+  title: string;
+  address: string;
+}
+
+/**
+ * List the locations under a given account (e.g. "accounts/1234567890").
+ */
+export async function listLocations(refreshToken: string, accountName: string): Promise<GbpLocation[]> {
+  const accessToken = await getGoogleAccessToken(refreshToken);
+
+  const url = `https://mybusinessbusinessinformation.googleapis.com/v1/${accountName}/locations?readMask=name,title,storefrontAddress`;
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    throw new Error(`GBP locations.list failed: ${res.status} ${await res.text()}`);
+  }
+
+  const data = await res.json();
+
+  return (data.locations ?? []).map((l: any) => {
+    const addr = l.storefrontAddress;
+    const addressParts = addr ? [addr.addressLines?.join(", "), addr.locality, addr.administrativeArea] : [];
+    return {
+      name: l.name,
+      title: l.title ?? l.name,
+      address: addressParts.filter(Boolean).join(", "),
+    };
+  });
+}

@@ -60,26 +60,29 @@ webhooks, no polling).
 1. Go to [developers.facebook.com/apps](https://developers.facebook.com/apps) → **Create App** → type "Business".
 2. Add the **Webhooks** product. Subscribe your app to the **Page** and
    **Instagram** objects.
-3. Note your **App ID** and **App Secret** (Settings → Basic) →
+3. Add the **Facebook Login** product too — this is what the admin panel's
+   "Connect Facebook/Instagram" button uses.
+4. Note your **App ID** and **App Secret** (Settings → Basic) →
    `META_APP_ID`, `META_APP_SECRET`.
-4. Pick any random string for `META_VERIFY_TOKEN` (e.g. generate one with
+5. Pick any random string for `META_VERIFY_TOKEN` (e.g. generate one with
    `openssl rand -hex 16`) — you'll enter this in the Meta dashboard *and*
    your Vercel env vars; they must match.
-5. **Per client**, in Meta Business Suite:
-   - Connect their Instagram Business/Creator account to their Facebook Page.
-   - Generate a long-lived **Page Access Token** for that Page (Graph API
-     Explorer → select the Page → "Generate Access Token", then exchange for
-     a long-lived token via `/oauth/access_token?grant_type=fb_exchange_token`).
-   - Note the **Page ID** (`meta_page_id`) and **Instagram Business Account
-     ID** (`meta_ig_account_id`, found via `GET /{page-id}?fields=instagram_business_account`).
-6. **App Review**: to use this on real client accounts (not just your own
+6. **Per client**: in Meta Business Suite, connect their Instagram
+   Business/Creator account to their Facebook Page (the admin panel's
+   Connect button captures the Page token and Instagram account ID
+   automatically — see "Admin panel" section below).
+7. **App Review**: to use this on real client accounts (not just your own
    test account), submit for review with permissions:
-   `pages_manage_engagement`, `pages_read_engagement`, `instagram_manage_comments`,
-   `instagram_basic`. Provide a short screen recording of the flow — Meta's
-   review for these is usually 1-2 weeks.
-7. After deploying to Vercel (step 6 below), set the webhook URL in Meta to:
+   `pages_show_list`, `pages_read_engagement`, `pages_manage_engagement`,
+   `pages_manage_posts`, `instagram_basic`, `instagram_manage_comments`,
+   `business_management`. Provide a short screen recording of the flow —
+   Meta's review for these is usually 1-2 weeks. Until approved, the Connect
+   button will only work for Pages owned by the app's own
+   developers/testers (Meta returns `meta_no_pages` for anyone else — this
+   is expected and the connection can be retried once approved).
+8. After deploying to Vercel (step 6 below), set the webhook URL in Meta to:
    `https://YOUR-APP.vercel.app/api/webhooks/meta`
-   with the verify token from step 4. Subscribe to the `comments` field (IG)
+   with the verify token from step 5. Subscribe to the `comments` field (IG)
    and `feed` field (FB Page).
 
 ---
@@ -91,20 +94,18 @@ webhooks, no polling).
    step 5).
 2. Enable **YouTube Data API v3** (APIs & Services → Library).
 3. Create an **OAuth 2.0 Client ID** (APIs & Services → Credentials → Create
-   Credentials → OAuth client ID → Web application). Add
-   `https://developers.google.com/oauthplayground` as an authorized redirect URI.
+   Credentials → OAuth client ID → Web application). Add these **Authorized
+   redirect URIs** (both — the admin panel uses one client ID for both
+   YouTube and GBP connects):
+   - `https://YOUR-APP.vercel.app/api/oauth/youtube/callback`
+   - `https://YOUR-APP.vercel.app/api/oauth/gbp/callback`
+   - For local testing, also add the `http://localhost:3000/...` equivalents.
 4. Copy the Client ID/Secret → `YOUTUBE_OAUTH_CLIENT_ID`, `YOUTUBE_OAUTH_CLIENT_SECRET`.
-5. **Per client**, get a refresh token for their YouTube channel:
-   - Go to [Google OAuth Playground](https://developers.google.com/oauthplayground).
-   - Click the gear icon → check "Use your own OAuth credentials" → paste
-     your Client ID/Secret.
-   - In Step 1, select scope `https://www.googleapis.com/auth/youtube.force-ssl`.
-   - Authorize using **the client's** Google account (the one that owns the
-     YouTube channel).
-   - In Step 2, click "Exchange authorization code for tokens" → copy the
-     **Refresh token** → store as `youtube_refresh_token` for that client.
-   - Find their Channel ID (YouTube Studio → Settings → Channel → Advanced) →
-     `youtube_channel_id`.
+5. **Per client**: log in to the admin panel (`/admin/clients`), open the
+   client, and click **Connect YouTube**. Sign in with **the client's**
+   Google account (the one that owns the YouTube channel) and approve
+   access — the channel ID and refresh token are captured and saved
+   automatically. See "Admin panel" section below.
 
 ---
 
@@ -118,19 +119,27 @@ the other platforms first.
    been active 60+ days, and a business website matching the profile.
 2. Apply via the [GBP API access request form](https://support.google.com/business/contact/api_default).
    Describe your use case honestly: "marketing agency replying to client
-   reviews on their behalf."
+   reviews on their behalf." (Velocity Tech's case: **7-5896000040841**.)
 3. Once approved, in the **same Google Cloud project** as step 4, enable the
-   Business Profile APIs (Account Management, Business Information).
-4. Reuse the same OAuth client. Get a refresh token via OAuth Playground
-   again, this time with scope `https://www.googleapis.com/auth/business.manage`,
-   authorized by **the client's** Google account that manages their Business
-   Profile → `gbp_refresh_token`.
-5. Find `gbp_account_id` and `gbp_location_id`:
-   - `GET https://mybusinessaccountmanagement.googleapis.com/v1/accounts` (with the access token) → account ID.
-   - `GET https://mybusinessbusinessinformation.googleapis.com/v1/accounts/{accountId}/locations` → location ID.
+   Business Profile APIs (Account Management, Business Information) and the
+   legacy My Business API (used for review read/reply).
+4. Make sure `https://YOUR-APP.vercel.app/api/oauth/gbp/callback` is in the
+   OAuth client's Authorized redirect URIs (added in step 4.3 above — same
+   client ID is reused).
+5. **Per client**: in the admin panel, open the client and click **Connect
+   Google Business**. Sign in with **the client's** Google account that
+   manages their Business Profile and approve `business.manage` access.
+   - If the account has exactly one location, `gbp_account_id` and
+     `gbp_location_id` are captured automatically.
+   - If it has multiple accounts/locations, you'll land on a picker to
+     choose the right one.
+   - If GBP API access isn't approved yet for this Google Cloud project,
+     you'll see a "no accounts found" message — the refresh token is still
+     saved, so just click **Choose location** again once access is granted
+     (no need to reconnect).
 
-**While waiting for approval**, leave `gbp_*` fields empty for that client —
-the cron job simply skips clients without GBP configured.
+**While waiting for approval**, the cron job simply skips clients without
+`gbp_account_id`/`gbp_location_id` set.
 
 ---
 
@@ -139,10 +148,12 @@ the cron job simply skips clients without GBP configured.
 1. Push this folder to a GitHub repo.
 2. Go to [vercel.com/new](https://vercel.com/new), import the repo.
 3. Add all environment variables from `.env.example` in the Vercel project
-   settings (Settings → Environment Variables).
+   settings (Settings → Environment Variables), including `ADMIN_PASSWORD`
+   (pick a strong password — this is the only login for `/admin`).
 4. Deploy. Your app is now live at `https://YOUR-APP.vercel.app`.
-5. Go back to step 3.7 and register the webhook URL in Meta now that you
-   have a real domain.
+5. Go back and register the OAuth redirect URIs from steps 3.7/4.3/5.4 in
+   Google Cloud Console and Meta, now that you have a real domain. Register
+   the Meta webhook URL too (step 3.8).
 
 ---
 
@@ -162,17 +173,52 @@ which is too slow for comments. Instead, use a free external pinger:
 
 ## 8. Add your first client
 
-In Supabase → Table Editor → `clients`, insert a row with:
+1. Go to `https://YOUR-APP.vercel.app/login` and sign in with `ADMIN_PASSWORD`.
+2. Click **Clients → + Add client**. Fill in:
+   - `name`: e.g. "Dr Ashar Ali Clinic"
+   - `ai_instructions`: tone, services, languages, escalation rules — see the
+     example in `supabase/schema.sql`
+   - `active`: checked
+3. Save, then on the client page click **Connect** for each platform this
+   client uses (YouTube, Google Business, Instagram/Facebook) — see the
+   "Admin panel" section below for what each button does.
 
-- `name`: e.g. "Dr Ashar Ali Clinic"
-- `ai_instructions`: tone, services, languages, escalation rules — see the
-  example in `supabase/schema.sql`
-- The platform IDs/tokens you collected above for whichever platforms this
-  client uses (leave others `null`)
-- `active`: `true`
+That's it — no Supabase Table Editor or OAuth Playground needed. Comments
+start flowing immediately for Instagram/Facebook (webhook), and within one
+polling cycle for YouTube/GBP, once a platform shows "Connected".
 
-That's it — no redeploy needed. Comments start flowing immediately for
-Instagram/Facebook (webhook), and within one polling cycle for YouTube/GBP.
+---
+
+## Admin panel — connecting client accounts
+
+`/admin/clients` (behind the `ADMIN_PASSWORD` login at `/login`) replaces
+manual Supabase Table Editor + OAuth Playground work for day-to-day client
+management:
+
+- **List / add / edit clients** — name, AI instructions, active toggle.
+- **Connect buttons** per platform, each kicking off the real OAuth flow and
+  saving tokens automatically:
+  - **YouTube** — fully working today. Click Connect, sign in as the
+    client, done.
+  - **Google Business Profile** — works today for capturing the refresh
+    token; account/location auto-fill (or the picker) depends on GBP API
+    access being approved for this Google Cloud project (case
+    7-5896000040841, ~7-10 business days). If you see a "no accounts found"
+    message after connecting, the token is saved — click **Choose location**
+    again once approval comes through.
+  - **Instagram / Facebook** — share one Page Access Token. Click Connect on
+    either, log in with the client's Facebook account, and pick the right
+    Page if they manage more than one. Until Meta App Review is approved
+    (1-2 weeks), this only works for Pages owned by the app's own
+    developers/testers — real client accounts will see a "no pages found"
+    message, which is expected.
+- **Disconnect** — clears the stored tokens for that platform (Instagram and
+  Facebook disconnect together, since they share one Page token).
+- **Logout** — top-right of the nav, clears the admin session cookie.
+
+If a Connect button shows an error banner, the messages are written to be
+self-explanatory (e.g. "Meta App Review hasn't approved this app yet") — no
+need to dig through logs for routine pending-approval cases.
 
 ---
 

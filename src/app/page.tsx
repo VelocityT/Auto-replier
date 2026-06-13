@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import TopNav from "./components/TopNav";
 import FlaggedQueue, { type FlaggedItemWithClient } from "./components/FlaggedQueue";
 
 export const dynamic = "force-dynamic";
@@ -19,14 +20,7 @@ export default async function HomePage() {
 
   return (
     <div className="container">
-      <nav className="top-nav">
-        <a href="/" className="nav-link active">
-          Review Queue
-        </a>
-        <a href="/dashboard" className="nav-link">
-          Dashboard
-        </a>
-      </nav>
+      <TopNav active="queue" />
 
       <h1>Review Queue</h1>
       <p className="subtitle">
