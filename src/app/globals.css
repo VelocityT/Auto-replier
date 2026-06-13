@@ -827,3 +827,122 @@ a.btn-reject {
 .connection-card-actions .btn-reject {
   width: 100%;
 }
+
+/* ───────────────────────────────────────────────
+   Dashboard — greeting header, pastel stat cards,
+   per-platform connection circles on client cards
+   ─────────────────────────────────────────────── */
+
+.dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.dash-header h1 {
+  font-size: 26px;
+}
+
+.dash-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e6f1fb;
+  color: #185fa5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 14px;
+}
+
+.dash-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.dash-stat-card {
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.dash-stat-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.dash-stat-value {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.dash-stat-label {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 4px 0 0;
+}
+
+.dash-stat-purple { background: #EEEDFE; }
+.dash-stat-purple .dash-stat-icon { background: #CECBF6; }
+.dash-stat-purple .dash-stat-value { color: #26215C; }
+.dash-stat-purple .dash-stat-label { color: #534AB7; }
+
+.dash-stat-teal { background: #E1F5EE; }
+.dash-stat-teal .dash-stat-icon { background: #9FE1CB; }
+.dash-stat-teal .dash-stat-value { color: #04342C; }
+.dash-stat-teal .dash-stat-label { color: #0F6E56; }
+
+.dash-stat-coral { background: #FAECE7; }
+.dash-stat-coral .dash-stat-icon { background: #F5C4B3; }
+.dash-stat-coral .dash-stat-value { color: #4A1B0C; }
+.dash-stat-coral .dash-stat-label { color: #993C1D; }
+
+.dash-stat-amber { background: #FAEEDA; }
+.dash-stat-amber .dash-stat-icon { background: #FAC775; }
+.dash-stat-amber .dash-stat-value { color: #412402; }
+.dash-stat-amber .dash-stat-label { color: #854F0B; }
+
+.platform-circle-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.platform-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+}
+
+.platform-circle-on.platform-circle-youtube { background: #FAECE7; }
+.platform-circle-on.platform-circle-instagram { background: #FBEAF0; }
+.platform-circle-on.platform-circle-facebook { background: #E6F1FB; }
+.platform-circle-on.platform-circle-gbp { background: #FAEEDA; }
+
+.platform-circle-off {
+  background: #f3f4f8;
+  opacity: 0.45;
+}

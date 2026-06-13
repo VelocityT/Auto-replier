@@ -20,6 +20,8 @@ const PLATFORM_ICONS: Record<Platform, string> = {
 
 const PLATFORM_ORDER: Platform[] = ["gbp", "youtube", "instagram", "facebook"];
 
+const PLATFORM_DISPLAY_ORDER: Platform[] = ["youtube", "instagram", "facebook", "gbp"];
+
 interface PostStat {
   key: string;
   label: string;
@@ -197,17 +199,79 @@ export default async function DashboardPage() {
     day: "numeric",
   });
 
+  // Greeting + a few headline numbers for the pastel stat cards.
+  const istHour = new Date(Date.now() + 5.5 * 60 * 60 * 1000).getUTCHours();
+  const greeting = istHour < 12 ? "Good morning" : istHour < 17 ? "Good afternoon" : "Good evening";
+
+  const activeClients = clients.filter((c) => c.active).length;
+
+  const connectedCount = clients.reduce((sum, c) => {
+    let n = 0;
+    if (c.youtube_refresh_token) n++;
+    if (c.gbp_refresh_token) n++;
+    if (c.meta_page_id && c.meta_page_access_token) n++;
+    if (c.meta_ig_account_id && c.meta_page_access_token) n++;
+    return sum + n;
+  }, 0);
+  const totalPossible = clients.length * 4;
+
   return (
     <div className="container dashboard">
       <TopNav active="dashboard" />
 
-      <h1>Dashboard</h1>
-      <p className="subtitle">{todayLabel} · across all clients</p>
+      <div className="dash-header">
+        <div>
+          <h1>{greeting}, Velocity Tech</h1>
+          <p className="subtitle" style={{ marginBottom: 0 }}>
+            Here&apos;s what&apos;s happening across your clients — {todayLabel}
+          </p>
+        </div>
+        <div className="dash-avatar">VT</div>
+      </div>
 
       {error ? (
         <div className="card">Error loading dashboard: {error.message}</div>
       ) : (
         <>
+          <div className="dash-stat-grid">
+            <div className="dash-stat-card dash-stat-purple">
+              <div className="dash-stat-icon">👥</div>
+              <p className="dash-stat-value">{activeClients}</p>
+              <p className="dash-stat-label">Active clients</p>
+            </div>
+            <div className="dash-stat-card dash-stat-teal">
+              <div className="dash-stat-icon">✅</div>
+              <p className="dash-stat-value">{totals.replied}</p>
+              <p className="dash-stat-label">Auto-replied today</p>
+            </div>
+            <div className="dash-stat-card dash-stat-coral">
+              <div className="dash-stat-icon">🚩</div>
+              <p className="dash-stat-value">{totals.pending}</p>
+              <p className="dash-stat-label">Awaiting review</p>
+            </div>
+            <div className="dash-stat-card dash-stat-amber">
+              <div className="dash-stat-icon">🔌</div>
+              <p className="dash-stat-value">
+                {connectedCount}/{totalPossible}
+              </p>
+              <p className="dash-stat-label">Platforms connected</p>
+            </div>
+          </div>
+
+          <h3 className="section-title">Your clients</h3>
+          {allStats.length === 0 ? (
+            <div className="empty-state">No clients yet. Add one from the Clients tab to get started.</div>
+          ) : (
+            <div className="client-grid">
+              {allStats.map((stats) => (
+                <ClientCard key={stats.client.id} stats={stats} />
+              ))}
+            </div>
+          )}
+
+          <h3 className="section-title" style={{ marginTop: 28 }}>
+            Reports
+          </h3>
           <div className="platform-grid">
             {PLATFORM_ORDER.map((p) => (
               <a key={p} href={`/dashboard/${p}`} className={`platform-box platform-box-${p}`}>
@@ -233,31 +297,6 @@ export default async function DashboardPage() {
               </a>
             ))}
           </div>
-
-          <div className="summary-row">
-            <div className="summary-tile">
-              <div className="summary-value">{totals.comments}</div>
-              <div className="summary-label">Comments today</div>
-            </div>
-            <div className="summary-tile">
-              <div className="summary-value">{totals.replied}</div>
-              <div className="summary-label">Replies sent today</div>
-            </div>
-            <div className="summary-tile summary-tile-warn">
-              <div className="summary-value">{totals.pending}</div>
-              <div className="summary-label">Awaiting your review</div>
-            </div>
-          </div>
-
-          {allStats.length === 0 ? (
-            <div className="empty-state">No clients yet. Add one in Supabase to get started.</div>
-          ) : (
-            <div className="client-grid">
-              {allStats.map((stats) => (
-                <ClientCard key={stats.client.id} stats={stats} />
-              ))}
-            </div>
-          )}
         </>
       )}
     </div>
@@ -284,16 +323,19 @@ function ClientCard({ stats }: { stats: ClientStats }) {
             {client.active ? "Active" : "Inactive"}
           </span>
         </div>
-        <div className="platform-icons">
-          {configuredPlatforms.length === 0 ? (
-            <span className="reasoning">No platforms connected yet</span>
-          ) : (
-            configuredPlatforms.map((p) => (
-              <span key={p} className={`platform-pill platform-${p}`}>
-                {PLATFORM_ICONS[p]} {PLATFORM_LABELS[p]}
+        <div className="platform-circle-row">
+          {PLATFORM_DISPLAY_ORDER.map((p) => {
+            const on = configuredPlatforms.includes(p);
+            return (
+              <span
+                key={p}
+                className={`platform-circle ${on ? `platform-circle-on platform-circle-${p}` : "platform-circle-off"}`}
+                title={`${PLATFORM_LABELS[p]} — ${on ? "connected" : "not connected"}`}
+              >
+                {PLATFORM_ICONS[p]}
               </span>
-            ))
-          )}
+            );
+          })}
         </div>
       </div>
 
