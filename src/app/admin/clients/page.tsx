@@ -1,8 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import type { ClientConfig } from "@/lib/types";
 import { toSafeClient } from "@/lib/clients";
-import { PLATFORM_ICONS, PLATFORM_LABELS, PLATFORM_ORDER } from "@/lib/platforms";
+import { PLATFORM_LABELS, PLATFORM_ORDER } from "@/lib/platforms";
 import TopNav from "@/app/components/TopNav";
+import PlatformIcon from "@/app/components/PlatformIcon";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,8 @@ export default async function AdminClientsPage() {
                       key={p}
                       className={`platform-pill platform-${p} ${conn.connected ? "" : "platform-pill-off"}`}
                     >
-                      {PLATFORM_ICONS[p]} {PLATFORM_LABELS[p]} {conn.connected ? "✓" : "—"}
+                      <PlatformIcon platform={p} size={14} /> {PLATFORM_LABELS[p]}{" "}
+                      {conn.connected ? "✓" : "—"}
                     </span>
                   );
                 })}

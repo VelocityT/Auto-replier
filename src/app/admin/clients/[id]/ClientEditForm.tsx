@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SafeClient } from "@/lib/clients";
-import { PLATFORM_ICONS, PLATFORM_LABELS } from "@/lib/platforms";
+import { PLATFORM_LABELS } from "@/lib/platforms";
+import PlatformIcon from "@/app/components/PlatformIcon";
 
 interface ConnectionMeta {
   platform: "gbp" | "youtube" | "facebook" | "instagram";
@@ -187,7 +188,9 @@ export default function ClientEditForm({ client }: { client: SafeClient }) {
           return (
             <div key={meta.platform} className="connection-card">
               <div className="connection-card-header">
-                <span className="connection-card-icon">{PLATFORM_ICONS[meta.platform]}</span>
+                <span className="connection-card-icon">
+                  <PlatformIcon platform={meta.platform} size={20} />
+                </span>
                 <span className="connection-card-title">{PLATFORM_LABELS[meta.platform]}</span>
                 <span className={conn.connected ? "connection-status connection-status-on" : "connection-status connection-status-off"}>
                   {conn.connected ? "Connected" : "Not connected"}

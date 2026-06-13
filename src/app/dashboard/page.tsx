@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import TopNav from "@/app/components/TopNav";
+import PlatformIcon from "@/app/components/PlatformIcon";
 import type { ClientConfig, FlaggedItem, Platform, ProcessedItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -9,13 +10,6 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   facebook: "Facebook",
   youtube: "YouTube",
   gbp: "Google Business",
-};
-
-const PLATFORM_ICONS: Record<Platform, string> = {
-  instagram: "\u{1F4F8}",
-  facebook: "\u{1F44D}",
-  youtube: "\u{25B6}\u{FE0F}",
-  gbp: "\u{2B50}",
 };
 
 const PLATFORM_ORDER: Platform[] = ["gbp", "youtube", "instagram", "facebook"];
@@ -276,7 +270,9 @@ export default async function DashboardPage() {
             {PLATFORM_ORDER.map((p) => (
               <a key={p} href={`/dashboard/${p}`} className={`platform-box platform-box-${p}`}>
                 <div className="platform-box-top">
-                  <span className="platform-box-icon">{PLATFORM_ICONS[p]}</span>
+                  <span className="platform-box-icon">
+                    <PlatformIcon platform={p} size={22} />
+                  </span>
                   <span className="platform-box-name">{PLATFORM_LABELS[p]}</span>
                 </div>
                 <div className="platform-box-stats">
@@ -332,7 +328,7 @@ function ClientCard({ stats }: { stats: ClientStats }) {
                 className={`platform-circle ${on ? `platform-circle-on platform-circle-${p}` : "platform-circle-off"}`}
                 title={`${PLATFORM_LABELS[p]} — ${on ? "connected" : "not connected"}`}
               >
-                {PLATFORM_ICONS[p]}
+                <PlatformIcon platform={p} size={18} />
               </span>
             );
           })}
@@ -365,7 +361,9 @@ function ClientCard({ stats }: { stats: ClientStats }) {
           <div className="post-list-title">Today, by post</div>
           {posts.map((post) => (
             <div className="post-row" key={post.key}>
-              <span className="post-platform-icon">{PLATFORM_ICONS[post.platform]}</span>
+              <span className="post-platform-icon">
+                <PlatformIcon platform={post.platform} size={16} />
+              </span>
               <div className="post-info">
                 {post.url ? (
                   <a href={post.url} target="_blank" rel="noopener noreferrer" className="post-label">

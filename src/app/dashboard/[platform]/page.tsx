@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import TopNav from "@/app/components/TopNav";
+import PlatformIcon from "@/app/components/PlatformIcon";
 import type { ClientConfig, FlaggedItem, Platform, ProcessedItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -10,13 +11,6 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   facebook: "Facebook",
   youtube: "YouTube",
   gbp: "Google Business",
-};
-
-const PLATFORM_ICONS: Record<Platform, string> = {
-  instagram: "\u{1F4F8}",
-  facebook: "\u{1F44D}",
-  youtube: "\u{25B6}\u{FE0F}",
-  gbp: "\u{2B50}",
 };
 
 const VALID_PLATFORMS: Platform[] = ["gbp", "youtube", "instagram", "facebook"];
@@ -162,8 +156,9 @@ export default async function PlatformPage({ params }: { params: { platform: str
     <div className="container dashboard">
       <TopNav active="dashboard" />
 
-      <h1>
-        {PLATFORM_ICONS[platform]} {PLATFORM_LABELS[platform]}
+      <h1 style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <PlatformIcon platform={platform} size={28} />
+        {PLATFORM_LABELS[platform]}
       </h1>
       <p className="subtitle">
         <a href="/dashboard" style={{ color: "#4f46e5", fontWeight: 600, textDecoration: "none" }}>
