@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { SafeClient } from "@/lib/clients";
 import { PLATFORM_LABELS } from "@/lib/platforms";
@@ -23,7 +23,7 @@ const CONNECTIONS: ConnectionMeta[] = [
       if (c.connections.gbp.location_id) lines.push(`Location: ${c.connections.gbp.location_id}`);
       return lines;
     },
-    note: "Requires Google's GBP API access approval (in progress) before reviews sync.",
+    note: undefined,
   },
   {
     platform: "youtube",
@@ -66,6 +66,18 @@ export default function ClientEditForm({ client }: { client: SafeClient }) {
   const [deleting, setDeleting] = useState(false);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [status, setStatus] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+
+  // Re-fetch connection status client-side to bypass SSR/edge caching issues.
+  useEffect(() => {
+    fetch(`/api/clients/${client.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok && data.client) {
+          setConnections(data.client.connections);
+        }
+      })
+      .catch(() => {/* ignore — fall back to server-rendered state */});
+  }, [client.id]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
