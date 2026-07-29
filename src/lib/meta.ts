@@ -94,9 +94,13 @@ export function parseWebhookEvents(payload: any): MetaCommentEvent[] {
 export async function replyToComment(
   commentId: string,
   message: string,
-  pageAccessToken: string
+  pageAccessToken: string,
+  platform: "instagram" | "facebook" = "instagram"
 ): Promise<void> {
-  const url = `${GRAPH_API_BASE}/${commentId}/replies`;
+  // Instagram Login tokens only work against graph.instagram.com; Facebook
+  // Page tokens only work against graph.facebook.com. Route accordingly.
+  const base = platform === "instagram" ? INSTAGRAM_GRAPH_BASE : GRAPH_API_BASE;
+  const url = `${base}/${commentId}/replies`;
 
   const res = await fetch(url, {
     method: "POST",
@@ -124,49 +128,140 @@ export const META_APP_SECRET = process.env.META_APP_SECRET;
 // user manages more than one Page. Cleared once a Page is selected.
 export const META_PAGES_COOKIE = "ar_meta_pages";
 
-// Scopes needed to read + reply to comments on a Page's posts and on the
-// Page's linked Instagram Business account.
+// ─────────────────────────────────────────────
+// Instagram API with Instagram Login
+//
+// The app is submitted to Meta App Review for the `instagram_business_*`
+// permission set. Those permissions are only issued through Instagram Login
+// (instagram.com/oauth/authorize) — NOT the Facebook Login dialog. A client
+// connects their Instagram Business/Creator account directly; no linked
+// Facebook Page is required, which matters for smaller clients who never set
+// one up properly.
+//
+// Legacy note: this app previously requested the Facebook Login permission
+// set (instagram_basic, instagram_manage_comments, pages_*). Those are a
+// different product configuration and do NOT match the current submission —
+// requesting them would fail with "Invalid Scope" once review is approved.
+// ─────────────────────────────────────────────
+
+/** Instagram app ID — distinct from the Facebook app ID. */
+export const INSTAGRAM_APP_ID = process.env.INSTAGRAM_APP_ID;
+export const INSTAGRAM_APP_SECRET = process.env.INSTAGRAM_APP_SECRET;
+
+export const INSTAGRAM_OAUTH_AUTHORIZE_URL = "https://www.instagram.com/oauth/authorize";
+export const INSTAGRAM_OAUTH_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
+export const INSTAGRAM_GRAPH_BASE = "https://graph.instagram.com/v23.0";
+
+// Scopes needed to read + reply to comments on the client's Instagram
+// Business account. Must stay in sync with the Meta App Review submission.
 export const META_OAUTH_SCOPES = [
-  "pages_show_list",
-  "pages_read_engagement",
-  "pages_manage_engagement",
-  "pages_manage_posts",
-  "instagram_basic",
-  "instagram_manage_comments",
-  "business_management",
+  "instagram_business_basic",
+  "instagram_business_manage_comments",
+  "instagram_business_manage_messages",
+  "instagram_business_manage_insights",
 ].join(",");
 
-/** Exchange an OAuth `code` for a short-lived user access token. */
-export async function exchangeMetaCode(code: string, redirectUri: string): Promise<{ access_token: string }> {
-  const params = new URLSearchParams({
-    client_id: META_APP_ID ?? "",
-    client_secret: META_APP_SECRET ?? "",
+/**
+ * Exchange an Instagram OAuth `code` for a short-lived access token.
+ *
+ * Unlike the Facebook token endpoint this is a POST with form-encoded body,
+ * and it returns the Instagram user id alongside the token.
+ */
+export async function exchangeMetaCode(
+  code: string,
+  redirectUri: string
+): Promise<{ access_token: string; user_id: string; permissions?: string }> {
+  const body = new URLSearchParams({
+    client_id: INSTAGRAM_APP_ID ?? "",
+    client_secret: INSTAGRAM_APP_SECRET ?? "",
+    grant_type: "authorization_code",
     redirect_uri: redirectUri,
     code,
   });
 
-  const res = await fetch(`${GRAPH_API_BASE}/oauth/access_token?${params.toString()}`);
+  const res = await fetch(INSTAGRAM_OAUTH_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
 
   if (!res.ok) {
-    throw new Error(`Meta code exchange failed: ${res.status} ${await res.text()}`);
+    throw new Error(`Instagram code exchange failed: ${res.status} ${await res.text()}`);
+  }
+
+  const data = await res.json();
+  return {
+    access_token: data.access_token,
+    user_id: String(data.user_id ?? ""),
+    permissions: data.permissions,
+  };
+}
+
+/**
+ * Exchange a short-lived Instagram token for a long-lived one (~60 days).
+ *
+ * Long-lived tokens are refreshable — see `refreshLongLivedToken`. Refresh
+ * before day 60 or the client silently stops receiving replies.
+ */
+export async function exchangeForLongLivedToken(
+  shortLivedToken: string
+): Promise<{ access_token: string; expires_in: number }> {
+  const params = new URLSearchParams({
+    grant_type: "ig_exchange_token",
+    client_secret: INSTAGRAM_APP_SECRET ?? "",
+    access_token: shortLivedToken,
+  });
+
+  const res = await fetch(`${INSTAGRAM_GRAPH_BASE}/access_token?${params.toString()}`);
+
+  if (!res.ok) {
+    throw new Error(`Instagram long-lived token exchange failed: ${res.status} ${await res.text()}`);
   }
 
   return res.json();
 }
 
-/** Exchange a short-lived user token for a long-lived one (~60 days). */
-export async function exchangeForLongLivedToken(shortLivedToken: string): Promise<{ access_token: string }> {
+/**
+ * Refresh a long-lived Instagram token for another 60 days. The token must be
+ * at least 24 hours old and not yet expired. Run this on a schedule (the
+ * existing cron is a natural home) so client connections don't lapse.
+ */
+export async function refreshLongLivedToken(
+  longLivedToken: string
+): Promise<{ access_token: string; expires_in: number }> {
   const params = new URLSearchParams({
-    grant_type: "fb_exchange_token",
-    client_id: META_APP_ID ?? "",
-    client_secret: META_APP_SECRET ?? "",
-    fb_exchange_token: shortLivedToken,
+    grant_type: "ig_refresh_token",
+    access_token: longLivedToken,
   });
 
-  const res = await fetch(`${GRAPH_API_BASE}/oauth/access_token?${params.toString()}`);
+  const res = await fetch(`${INSTAGRAM_GRAPH_BASE}/refresh_access_token?${params.toString()}`);
 
   if (!res.ok) {
-    throw new Error(`Meta long-lived token exchange failed: ${res.status} ${await res.text()}`);
+    throw new Error(`Instagram token refresh failed: ${res.status} ${await res.text()}`);
+  }
+
+  return res.json();
+}
+
+/** The connected Instagram Business account's own profile. */
+export interface InstagramAccount {
+  id: string;
+  username: string;
+  name?: string;
+}
+
+/**
+ * Fetch the profile of the Instagram account that authorized the app. Used
+ * in place of the old Page picker — Instagram Login authorizes exactly one
+ * account, so there is nothing to choose between.
+ */
+export async function getInstagramAccount(accessToken: string): Promise<InstagramAccount> {
+  const url = `${INSTAGRAM_GRAPH_BASE}/me?fields=id,username,name&access_token=${encodeURIComponent(accessToken)}`;
+
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    throw new Error(`Instagram account lookup failed: ${res.status} ${await res.text()}`);
   }
 
   return res.json();

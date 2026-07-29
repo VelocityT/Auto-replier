@@ -83,7 +83,14 @@ async function handleCommentEvent(event: ReturnType<typeof parseWebhookEvents>[n
   const analysis = await analyzeComment(event.text, client.ai_instructions);
 
   if (analysis.shouldAutoReply && analysis.reply && client.meta_page_access_token) {
-    await replyToComment(event.commentId, analysis.reply, client.meta_page_access_token);
+    // Instagram tokens hit graph.instagram.com, Facebook Page tokens hit
+    // graph.facebook.com — pass the platform so the right host is used.
+    await replyToComment(
+      event.commentId,
+      analysis.reply,
+      client.meta_page_access_token,
+      event.platform
+    );
 
     await supabase.from("processed_items").insert({
       client_id: client.id,

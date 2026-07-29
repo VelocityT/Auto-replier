@@ -1,11 +1,8 @@
 import { getGoogleAccessToken } from "./google-auth";
 
-// Google Business Profile reviews are managed via the legacy "My Business
-// API v4" endpoint. As of mid-2026 this remains the only endpoint for
-// reading/replying to reviews (review management was NOT split out into the
-// newer per-resource APIs). Access requires a separate, manually-approved
-// API access request — see README for the process.
-const API_BASE = "https://mybusiness.googleapis.com/v4";
+// Google Business Profile Reviews API (new split API, replaces legacy v4).
+// Enable in GCP: console.cloud.google.com/apis/library/mybusinessreviews.googleapis.com
+const API_BASE = "https://mybusinessreviews.googleapis.com/v1";
 
 export interface GbpReview {
   reviewId: string; // last path segment of `name`

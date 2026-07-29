@@ -3,9 +3,7 @@ import { supabase } from "@/lib/supabase";
 import {
   exchangeMetaCode,
   exchangeForLongLivedToken,
-  listPages,
-  getInstagramAccountForPage,
-  META_PAGES_COOKIE,
+  getInstagramAccount,
 } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
@@ -38,48 +36,23 @@ export async function GET(req: NextRequest) {
     const shortLived = await exchangeMetaCode(code, redirectUri);
     const longLived = await exchangeForLongLivedToken(shortLived.access_token);
 
-    const pages = await listPages(longLived.access_token);
+    // Instagram Login authorizes exactly one account, so there is no Page
+    // list and no picker step — read the profile straight off the token.
+    const account = await getInstagramAccount(longLived.access_token);
 
-    if (pages.length === 0) {
-      // Typical before Meta App Review — only the app's own
-      // developers/testers can be returned as manageable Pages.
-      adminUrl.searchParams.set("error", "meta_no_pages");
-      return NextResponse.redirect(adminUrl);
-    }
-
-    if (pages.length > 1) {
-      // Multiple Pages — let the admin pick which one belongs to this client.
-      const res = NextResponse.redirect(new URL(`/admin/clients/${clientId}/meta-pages`, req.url));
-      res.cookies.set(
-        META_PAGES_COOKIE,
-        JSON.stringify({ clientId, pages }),
-        {
-          httpOnly: true,
-          secure: true,
-          sameSite: "lax",
-          path: "/",
-          maxAge: 60 * 10, // 10 minutes
-        }
-      );
-      return res;
-    }
-
-    // Exactly one Page — resolve its linked Instagram account (if any) and save.
-    const page = pages[0];
-
-    let igAccountId: string | null = null;
-    try {
-      igAccountId = await getInstagramAccountForPage(page.id, page.access_token);
-    } catch {
-      // Non-fatal — Facebook connection is still saved below.
-    }
+    // Long-lived tokens last ~60 days and must be refreshed before expiry.
+    // Store the expiry so the cron can refresh proactively.
+    const expiresAt = new Date(Date.now() + (longLived.expires_in ?? 0) * 1000).toISOString();
 
     const { error: dbError } = await supabase
       .from("clients")
       .update({
-        meta_page_id: page.id,
-        meta_page_access_token: page.access_token,
-        meta_ig_account_id: igAccountId,
+        meta_ig_account_id: account.id,
+        meta_ig_username: account.username,
+        meta_page_access_token: longLived.access_token,
+        meta_token_expires_at: expiresAt,
+        // No Facebook Page in the Instagram Login flow.
+        meta_page_id: null,
       })
       .eq("id", clientId);
 
@@ -88,7 +61,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(adminUrl);
     }
 
-    adminUrl.searchParams.set("connected", "facebook");
+    adminUrl.searchParams.set("connected", "instagram");
     return NextResponse.redirect(adminUrl);
   } catch {
     adminUrl.searchParams.set("error", "meta_token_exchange_failed");

@@ -15,10 +15,16 @@ create table if not exists clients (
   -- (Hindi/English/Hinglish) the commenter used. Keep replies under 40 words."
   ai_instructions text not null default '',
 
-  -- Instagram / Facebook (Meta Graph API)
+  -- Instagram (Instagram API with Instagram Login).
+  -- meta_page_id is legacy: the Instagram Login flow has no Facebook Page.
+  -- Kept nullable so existing rows aren't broken.
   meta_page_id text,
   meta_ig_account_id text,
+  meta_ig_username text,
   meta_page_access_token text,
+  -- Instagram long-lived tokens expire after ~60 days and must be refreshed
+  -- before then, or the client silently stops receiving auto-replies.
+  meta_token_expires_at timestamptz,
 
   -- YouTube
   youtube_channel_id text,

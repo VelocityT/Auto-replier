@@ -63,7 +63,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       case "instagram":
       case "facebook":
         if (!client.meta_page_access_token) throw new Error("Missing meta_page_access_token");
-        await replyToMetaComment(item.external_id, replyText, client.meta_page_access_token);
+        await replyToMetaComment(
+          item.external_id,
+          replyText,
+          client.meta_page_access_token,
+          item.platform
+        );
         break;
 
       case "youtube":
