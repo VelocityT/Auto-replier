@@ -48,12 +48,23 @@ create table if not exists processed_items (
   platform text not null check (platform in ('instagram', 'facebook', 'youtube', 'gbp')),
   external_id text not null,
   status text not null check (status in ('auto_replied', 'flagged', 'ignored')),
+
+  -- { id, label, url } pointer to the post/video the comment sits on.
+  -- NULL for GBP — reviews are location-level, not attached to a post.
+  post_ref jsonb,
+  -- Denormalised copies so the dashboard can render without calling
+  -- back out to each platform's API.
+  original_text text,
+  reply_text text, -- only set on status = 'auto_replied'
+
   created_at timestamptz not null default now(),
 
   unique (client_id, platform, external_id)
 );
 
 create index if not exists idx_processed_items_client on processed_items(client_id, platform);
+create index if not exists idx_processed_items_created_at on processed_items(created_at desc);
+create index if not exists idx_processed_items_platform_status on processed_items(platform, status);
 
 -- ─────────────────────────────────────────────
 -- flagged_items: negative/urgent/ambiguous items that need a human
@@ -68,7 +79,10 @@ create table if not exists flagged_items (
   original_text text not null,
   ai_analysis jsonb not null,
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'posted')),
-  created_at timestamptz not null default now()
+  post_ref jsonb,
+  created_at timestamptz not null default now(),
+  -- Stamped by /api/flagged/[id] when a human approves or rejects.
+  updated_at timestamptz not null default now()
 );
 
 create index if not exists idx_flagged_items_status on flagged_items(client_id, status);

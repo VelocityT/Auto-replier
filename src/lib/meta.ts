@@ -17,15 +17,15 @@ export interface MetaCommentEvent {
 }
 
 /**
- * Verify the `X-Hub-Signature-256` header Meta sends on every webhook POST.
- * Always do this before trusting webhook payload contents.
+ * Verify the `X-Hub-Signature-256` header Meta sends on every webhook POST
+ * against ONE candidate secret.
  */
 export function verifyWebhookSignature(
   rawBody: string,
   signatureHeader: string | null,
   appSecret: string
 ): boolean {
-  if (!signatureHeader) return false;
+  if (!signatureHeader || !appSecret) return false;
   const expected =
     "sha256=" + crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex");
 
@@ -34,6 +34,36 @@ export function verifyWebhookSignature(
   const b = Buffer.from(signatureHeader);
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(a, b);
+}
+
+/**
+ * Verify a webhook signature against every secret this app might be signed
+ * with.
+ *
+ * Why more than one: Instagram Login webhooks are signed with the *Instagram*
+ * app secret, while Facebook Page webhooks are signed with the *Facebook* app
+ * secret. The payloads are structurally similar and hit the same endpoint, so
+ * we can't tell them apart before verifying. Try each configured secret and
+ * accept if any matches.
+ *
+ * Each candidate is checked in constant time, and an empty/undefined secret is
+ * rejected outright — so an unconfigured secret can never accidentally
+ * validate anything.
+ */
+export function verifyWebhookSignatureAny(
+  rawBody: string,
+  signatureHeader: string | null,
+  appSecrets: Array<string | undefined>
+): boolean {
+  if (!signatureHeader) return false;
+
+  let matched = false;
+  for (const secret of appSecrets) {
+    if (!secret) continue;
+    // No early return — keep the work constant regardless of which secret hits.
+    if (verifyWebhookSignature(rawBody, signatureHeader, secret)) matched = true;
+  }
+  return matched;
 }
 
 /**

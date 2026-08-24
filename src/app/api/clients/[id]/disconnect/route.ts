@@ -21,12 +21,16 @@ const FIELD_SETS: Record<string, Record<string, null>> = {
   facebook: {
     meta_page_id: null,
     meta_ig_account_id: null,
+    meta_ig_username: null,
     meta_page_access_token: null,
+    meta_token_expires_at: null,
   },
   instagram: {
     meta_page_id: null,
     meta_ig_account_id: null,
+    meta_ig_username: null,
     meta_page_access_token: null,
+    meta_token_expires_at: null,
   },
 };
 

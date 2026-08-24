@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { analyzeComment } from "@/lib/ai";
-import { parseWebhookEvents, replyToComment, verifyWebhookSignature } from "@/lib/meta";
+import { parseWebhookEvents, replyToComment, verifyWebhookSignatureAny } from "@/lib/meta";
 import type { ClientConfig } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -31,9 +31,16 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
 
   const signature = req.headers.get("x-hub-signature-256");
-  const appSecret = process.env.META_APP_SECRET ?? "";
 
-  if (!verifyWebhookSignature(rawBody, signature, appSecret)) {
+  // Instagram Login webhooks are signed with the INSTAGRAM app secret;
+  // Facebook Page webhooks are signed with the FACEBOOK app secret. Both
+  // land on this endpoint and look alike, so accept either.
+  const accepted = verifyWebhookSignatureAny(rawBody, signature, [
+    process.env.INSTAGRAM_APP_SECRET,
+    process.env.META_APP_SECRET,
+  ]);
+
+  if (!accepted) {
     return new NextResponse("Invalid signature", { status: 401 });
   }
 
