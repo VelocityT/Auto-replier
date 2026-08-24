@@ -8,6 +8,13 @@ import PlatformIcon from "@/app/components/PlatformIcon";
 
 interface ConnectionMeta {
   platform: "gbp" | "youtube" | "facebook" | "instagram";
+  // OAuth route segment under /api/oauth/<segment>/start.
+  //
+  // This is NOT always the same as `platform`: Instagram and Facebook are two
+  // separate cards in the UI but share one Meta OAuth flow at
+  // /api/oauth/meta/*. Deriving the URL from `platform` instead of this field
+  // is what produced 404s on /api/oauth/instagram/start.
+  oauthRoute: "gbp" | "youtube" | "meta";
   title: string;
   detailLines: (client: SafeClient) => string[];
   note?: string;
@@ -16,6 +23,7 @@ interface ConnectionMeta {
 const CONNECTIONS: ConnectionMeta[] = [
   {
     platform: "gbp",
+    oauthRoute: "gbp",
     title: "Google Business Profile",
     detailLines: (c) => {
       const lines: string[] = [];
@@ -27,6 +35,7 @@ const CONNECTIONS: ConnectionMeta[] = [
   },
   {
     platform: "youtube",
+    oauthRoute: "youtube",
     title: "YouTube",
     detailLines: (c) => {
       const lines: string[] = [];
@@ -36,23 +45,29 @@ const CONNECTIONS: ConnectionMeta[] = [
   },
   {
     platform: "instagram",
+    oauthRoute: "meta",
     title: "Instagram",
     detailLines: (c) => {
       const lines: string[] = [];
       if (c.connections.instagram.ig_account_id) lines.push(`Account: ${c.connections.instagram.ig_account_id}`);
       return lines;
     },
-    note: "Requires Meta App Review before going live on real client accounts.",
+    note: "Sign in with the client's own Instagram Business or Creator account. No Facebook Page needed.",
   },
   {
     platform: "facebook",
+    oauthRoute: "meta",
     title: "Facebook",
     detailLines: (c) => {
       const lines: string[] = [];
       if (c.connections.facebook.page_id) lines.push(`Page: ${c.connections.facebook.page_id}`);
       return lines;
     },
-    note: "Requires Meta App Review before going live on real client accounts.",
+    // The Facebook Page flow was retired when the app moved to Instagram
+    // Login. Connect goes to the same Meta OAuth route, which authorises an
+    // Instagram account — so use the Instagram card instead. Existing
+    // connections still show here and can still be disconnected.
+    note: "Legacy. New connections should use the Instagram card above.",
   },
 ];
 
@@ -237,7 +252,7 @@ export default function ClientEditForm({ client }: { client: SafeClient }) {
                     </button>
                   </>
                 ) : (
-                  <a href={`/api/oauth/${meta.platform}/start?clientId=${client.id}`} className="btn-approve">
+                  <a href={`/api/oauth/${meta.oauthRoute}/start?clientId=${client.id}`} className="btn-approve">
                     Connect {PLATFORM_LABELS[meta.platform]}
                   </a>
                 )}
