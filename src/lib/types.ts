@@ -44,7 +44,9 @@ export interface ClientConfig {
   // --- Instagram / Facebook (Meta Graph API) ---
   meta_page_id: string | null;
   meta_ig_account_id: string | null;
-  meta_page_access_token: string | null; // long-lived page token
+  meta_ig_username: string | null; // @handle, Instagram Login only
+  meta_page_access_token: string | null; // long-lived page/IG token
+  meta_token_expires_at: string | null; // ISO timestamp; Instagram Login tokens only, ~60 day life
 
   // --- YouTube ---
   youtube_channel_id: string | null;
