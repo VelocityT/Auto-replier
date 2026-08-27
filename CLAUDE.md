@@ -124,7 +124,32 @@ dashboard work before real client accounts can connect:
 
 Ordered by how badly they bite.
 
-1. **GBP reviews host is likely wrong.** `gbp.ts` calls
+1. **Instagram webhook account ID mismatch (confirmed live, Aug 2026).** The
+   ID `graph.instagram.com/me` returns at connect time (saved as
+   `meta_ig_account_id` by the OAuth callback) can differ from the ID Meta's
+   webhook actually puts in `entry.id` for comments on that *same* account.
+   Confirmed on shree medicare / @velocitytech.in: OAuth saved
+   `37847832231497193`, but every real comment webhook arrived tagged
+   `17841468309625304` — a totally different ID for the same physical
+   account. This is a known, long-unresolved Meta bug (see the Meta developer
+   community thread "Mismatch Between IDs in Instagram Business Webhooks and
+   Graph API" — no official fix as of Aug 2026), not something introduced by
+   this codebase.
+   - **Symptom:** dashboard stays at 0 forever; Vercel logs show
+     `[meta webhook] no active client found for meta_ig_account_id=<id>`
+     on every comment, even though the client is connected and active.
+   - **Fix per affected client:** take the `<id>` from that log line and
+     `PATCH /api/clients/{id}` with `{ "meta_ig_account_id": "<id>" }`
+     (added to the route specifically for this — see the field comment in
+     `src/app/api/clients/[id]/route.ts`). Deliberately not exposed in the
+     admin UI; this is a manual correction after the first failed webhook,
+     not a normal connect-flow field.
+   - **No general fix exists** — the correct ID isn't knowable until a real
+     webhook event reveals it, so every new client connecting via Instagram
+     Login should be treated as "unverified until the first comment shows up
+     in the dashboard or the logs."
+
+2. **GBP reviews host is likely wrong.** `gbp.ts` calls
    `https://mybusinessreviews.googleapis.com/v1` — Google never migrated
    reviews off the legacy My Business API. Reviews read/reply should be
    `https://mybusiness.googleapis.com/v4/accounts/{a}/locations/{l}/reviews`

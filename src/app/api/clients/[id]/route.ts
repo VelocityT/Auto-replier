@@ -27,10 +27,25 @@ interface UpdateBody {
   name?: string;
   ai_instructions?: string;
   active?: boolean;
+  // Escape hatch for the Instagram Login ID-mismatch issue: the ID returned
+  // by graph.instagram.com/me at connect time (saved by the OAuth callback)
+  // can differ from the ID Meta's webhook actually delivers in entry.id for
+  // the very same account — a known, unresolved Meta bug (see CLAUDE.md,
+  // "Known issues" — Instagram webhook account ID mismatch). When that
+  // happens the webhook handler logs
+  // "[meta webhook] no active client found for meta_ig_account_id=<id>"
+  // forever, and no comment ever reaches the dashboard. Once you've seen
+  // that log line, PATCH this field to the ID it reports and webhooks start
+  // matching immediately. Not exposed in the UI (deliberately) — this is a
+  // manual correction, not something a client-facing form should invite
+  // people to fiddle with.
+  meta_ig_account_id?: string;
 }
 
 // PATCH /api/clients/[id] — update name / ai_instructions / active.
-// Platform connections are managed via /api/oauth/*, not this endpoint.
+// Platform connections are managed via /api/oauth/*, not this endpoint,
+// except meta_ig_account_id — see the field comment above for why that one
+// exists here too.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   let body: UpdateBody;
   try {
@@ -49,6 +64,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   if (typeof body.ai_instructions === "string") update.ai_instructions = body.ai_instructions;
   if (typeof body.active === "boolean") update.active = body.active;
+  if (typeof body.meta_ig_account_id === "string" && body.meta_ig_account_id.trim()) {
+    update.meta_ig_account_id = body.meta_ig_account_id.trim();
+  }
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ ok: false, error: "No valid fields to update" }, { status: 400 });
