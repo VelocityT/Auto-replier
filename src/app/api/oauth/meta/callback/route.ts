@@ -4,6 +4,7 @@ import {
   exchangeMetaCode,
   exchangeForLongLivedToken,
   getInstagramAccount,
+  subscribeToWebhooks,
 } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +61,14 @@ export async function GET(req: NextRequest) {
       adminUrl.searchParams.set("error", "meta_save_failed");
       return NextResponse.redirect(adminUrl);
     }
+
+    // Completing OAuth does NOT make Meta start sending webhook events —
+    // each account has to be explicitly opted in to the fields this app
+    // acts on. Without this call the app-level Callback URL config (saved
+    // separately in the Meta dashboard) never actually fires for this
+    // account, and comments silently go nowhere. Non-fatal: the connection
+    // itself already succeeded and is saved above.
+    await subscribeToWebhooks(account.id, longLived.access_token);
 
     adminUrl.searchParams.set("connected", "instagram");
     return NextResponse.redirect(adminUrl);

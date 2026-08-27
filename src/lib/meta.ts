@@ -297,6 +297,51 @@ export async function getInstagramAccount(accessToken: string): Promise<Instagra
   return res.json();
 }
 
+// Webhook fields to subscribe each connected account to. `comments` is the
+// only one this app currently acts on.
+const INSTAGRAM_SUBSCRIBED_FIELDS = "comments";
+
+/**
+ * Subscribe an Instagram account to this app's webhook so Meta actually
+ * starts delivering `comments` events for it.
+ *
+ * This is easy to miss: completing OAuth and saving the app-level Callback
+ * URL (see the "Configure webhooks" step in the Meta dashboard) is NOT
+ * enough on its own. Each individual Instagram account also has to be
+ * opted in via this endpoint — the dashboard's own "Generate access
+ * tokens" screen does exactly this call under the hood for accounts you
+ * add manually as a developer/tester, but real clients connecting through
+ * Instagram Login never touch that screen, so nothing subscribes them
+ * unless the OAuth callback does it explicitly.
+ *
+ * Call this once right after saving a client's new access token.
+ * Safe to call again later (e.g. after a token refresh) — Meta just
+ * confirms the existing subscription.
+ */
+export async function subscribeToWebhooks(
+  igAccountId: string,
+  accessToken: string,
+  fields: string = INSTAGRAM_SUBSCRIBED_FIELDS
+): Promise<void> {
+  const url = `${INSTAGRAM_GRAPH_BASE}/${igAccountId}/subscribed_apps`;
+  const params = new URLSearchParams({
+    subscribed_fields: fields,
+    access_token: accessToken,
+  });
+
+  const res = await fetch(`${url}?${params.toString()}`, { method: "POST" });
+
+  if (!res.ok) {
+    // Non-fatal by design: the client's token and account id are already
+    // saved by this point, so a subscribe failure shouldn't roll back the
+    // whole connect flow. It does mean webhooks won't arrive until this is
+    // retried, so log loudly.
+    console.error(
+      `[meta] subscribed_apps failed for account ${igAccountId}: ${res.status} ${await res.text()}`
+    );
+  }
+}
+
 export interface MetaPage {
   id: string;
   name: string;

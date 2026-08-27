@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { refreshLongLivedToken } from "@/lib/meta";
+import { refreshLongLivedToken, subscribeToWebhooks } from "@/lib/meta";
 import type { ClientConfig } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -95,6 +95,14 @@ export async function GET(req: NextRequest) {
         failed[client.name] = `refreshed but DB write failed: ${dbError.message}`;
         console.error(`[cron/refresh-tokens] DB write failed for ${client.id}`, dbError);
         continue;
+      }
+
+      // Re-confirm the webhook subscription on every refresh. Cheap, and it
+      // means a client can never silently drift into "connected but Meta
+      // isn't actually sending events" the way the very first Instagram
+      // Login connections did before this call existed in the OAuth callback.
+      if (client.meta_ig_account_id) {
+        await subscribeToWebhooks(client.meta_ig_account_id, result.access_token);
       }
 
       refreshed.push(client.name);
