@@ -49,7 +49,8 @@ const CONNECTIONS: ConnectionMeta[] = [
     title: "Instagram",
     detailLines: (c) => {
       const lines: string[] = [];
-      if (c.connections.instagram.ig_account_id) lines.push(`Account: ${c.connections.instagram.ig_account_id}`);
+      if (c.connections.instagram.username) lines.push(`Account: @${c.connections.instagram.username}`);
+      else if (c.connections.instagram.ig_account_id) lines.push(`Account ID: ${c.connections.instagram.ig_account_id}`);
       return lines;
     },
     note: "Sign in with the client's own Instagram Business or Creator account. No Facebook Page needed.",

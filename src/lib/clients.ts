@@ -14,7 +14,7 @@ export interface SafeClient {
     youtube: { connected: boolean; channel_id: string | null };
     gbp: { connected: boolean; account_id: string | null; location_id: string | null };
     facebook: { connected: boolean; page_id: string | null };
-    instagram: { connected: boolean; ig_account_id: string | null };
+    instagram: { connected: boolean; ig_account_id: string | null; username: string | null };
   };
 }
 
@@ -42,6 +42,7 @@ export function toSafeClient(client: ClientConfig): SafeClient {
       instagram: {
         connected: !!client.meta_page_access_token && !!client.meta_ig_account_id,
         ig_account_id: client.meta_ig_account_id,
+        username: client.meta_ig_username,
       },
     },
   };
