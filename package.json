@@ -13,7 +13,7 @@
     "next": "^14.2.32",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "@supabase/supabase-js": "^2.45.4",
+    "@supabase/supabase-js": "^2.112.4",
     "@google/generative-ai": "^0.17.1"
   },
   "devDependencies": {
