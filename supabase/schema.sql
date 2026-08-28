@@ -88,6 +88,30 @@ create table if not exists flagged_items (
 create index if not exists idx_flagged_items_status on flagged_items(client_id, status);
 
 -- ─────────────────────────────────────────────
+-- pending_comments: queue for the Instagram/Facebook webhook path.
+-- The webhook just enqueues here (no AI call); /api/cron/flush-comments
+-- drains it per client in one batched Gemini call, same pattern as the
+-- YouTube/GBP crons. Keeps daily Gemini request count tracking "how often
+-- there's something pending" rather than "how many comments arrived" --
+-- important since the free tier is 20 requests/day/model.
+-- ─────────────────────────────────────────────
+create table if not exists pending_comments (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  platform text not null check (platform in ('instagram', 'facebook')),
+  external_id text not null,
+  author_name text,
+  text text not null,
+  post_ref jsonb,
+  created_at timestamptz not null default now(),
+
+  unique (client_id, platform, external_id)
+);
+
+create index if not exists idx_pending_comments_client
+  on pending_comments (client_id, platform, created_at);
+
+-- ─────────────────────────────────────────────
 -- Example: insert your first client
 -- (Replace the tokens once you've completed the README setup steps)
 -- ─────────────────────────────────────────────

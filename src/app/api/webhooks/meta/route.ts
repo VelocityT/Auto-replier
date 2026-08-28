@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { analyzeComment } from "@/lib/ai";
-import { parseWebhookEvents, replyToComment, verifyWebhookSignatureAny } from "@/lib/meta";
+import { parseWebhookEvents, verifyWebhookSignatureAny } from "@/lib/meta";
 import type { ClientConfig } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -109,47 +108,26 @@ async function handleCommentEvent(event: ReturnType<typeof parseWebhookEvents>[n
 
   if (existing) return;
 
-  const analysis = await analyzeComment(event.text, client.ai_instructions);
-
-  if (analysis.shouldAutoReply && analysis.reply && client.meta_page_access_token) {
-    // Instagram tokens hit graph.instagram.com, Facebook Page tokens hit
-    // graph.facebook.com — pass the platform so the right host is used.
-    await replyToComment(
-      event.commentId,
-      analysis.reply,
-      client.meta_page_access_token,
-      event.platform
-    );
-
-    await supabase.from("processed_items").insert({
-      client_id: client.id,
-      platform: event.platform,
-      external_id: event.commentId,
-      status: "auto_replied",
-      post_ref: event.postRef,
-      original_text: event.text,
-      reply_text: analysis.reply,
-    });
-  } else {
-    await supabase.from("flagged_items").insert({
+  // Don't call the AI here — just enqueue. Gemini's free tier is 20
+  // requests/day/model, so one call per incoming comment falls over well
+  // before ~100 comments/day. /api/cron/flush-comments drains this table
+  // per client in one analyzeCommentsBatch() call, the same batching trick
+  // the YouTube/GBP crons already use. onConflict + ignoreDuplicates is a
+  // second safety net alongside the processed_items check above, in case two
+  // webhook deliveries for the same comment race each other here.
+  const { error: enqueueError } = await supabase.from("pending_comments").upsert(
+    {
       client_id: client.id,
       platform: event.platform,
       external_id: event.commentId,
       author_name: event.authorName,
-      original_text: event.text,
-      ai_analysis: analysis,
-      status: "pending",
+      text: event.text,
       post_ref: event.postRef,
-    });
+    },
+    { onConflict: "client_id,platform,external_id", ignoreDuplicates: true }
+  );
 
-    await supabase.from("processed_items").insert({
-      client_id: client.id,
-      platform: event.platform,
-      external_id: event.commentId,
-      status: "flagged",
-      post_ref: event.postRef,
-      original_text: event.text,
-      reply_text: null,
-    });
+  if (enqueueError) {
+    console.error(`[meta webhook] failed to enqueue comment ${event.commentId}`, enqueueError);
   }
 }

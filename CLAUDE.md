@@ -18,9 +18,14 @@ on Vercel Hobby + Supabase free tier at ~₹0/month.
 ## Architecture
 
 ```
-Instagram/Facebook  → webhook  → /api/webhooks/meta   → analyzeComment()      (1 call/comment)
-YouTube             → polling  → /api/cron/youtube    → analyzeCommentsBatch() (1 call/client)
-Google Business     → polling  → /api/cron/gbp        → analyzeCommentsBatch() (1 call/client)
+Instagram/Facebook  → webhook  → /api/webhooks/meta        → enqueue only, no AI call
+                                        ↓
+                                 pending_comments (queue table)
+                                        ↓
+                     /api/cron/flush-comments (external pinger, every 3-5 min)
+                                        ↓                        analyzeCommentsBatch() (1 call/client)
+YouTube             → polling  → /api/cron/youtube         → analyzeCommentsBatch() (1 call/client)
+Google Business     → polling  → /api/cron/gbp             → analyzeCommentsBatch() (1 call/client)
                                         ↓
                      shouldAutoReply ? post reply + processed_items(auto_replied)
                                      : flagged_items(pending) + processed_items(flagged)
@@ -28,12 +33,35 @@ Google Business     → polling  → /api/cron/gbp        → analyzeCommentsBat
                      /  (Review Queue) → POST /api/flagged/[id] {approve|reject}
 ```
 
-**Batching matters.** Cron routes do two passes: pass 1 filters out
-already-processed items with no AI calls, pass 2 sends all new items for one
-client in a single Gemini call. This keeps free-tier usage proportional to
-*clients with activity*, not *comment count*. Don't refactor back to
-per-comment calls. The webhook path is per-comment because events arrive one
-at a time.
+**Batching matters.** All four paths (webhook included, as of Aug 2026) end up
+batching: pass 1 filters out already-processed items with no AI calls, pass 2
+sends all new items for one client in a single Gemini call. This keeps
+free-tier usage proportional to *clients with activity in that window*, not
+*comment count* — don't refactor back to a call per comment.
+
+The webhook path used to call `analyzeComment()` once per incoming comment,
+since webhook events arrive one at a time. That fell over in production: the
+Gemini free tier is 20 requests/day/model, so a client with real engagement
+(~100 comments/day) burned through it well before the day was over, and
+every comment after that got silently flagged instead of replied. Fixed by
+having the webhook only enqueue into `pending_comments`
+(`src/app/api/webhooks/meta/route.ts`) and adding `/api/cron/flush-comments`
+to drain it per client in one batched call, same as YouTube/GBP. Point a
+cron-job.org job at it every 3-5 minutes — a run that finds nothing pending
+makes zero Gemini calls, so idle clients cost nothing.
+
+**If ~100 comments/day is still tight even with batching**, the free-tier
+model itself is the bigger lever: `GEMINI_MODEL` defaults to
+`gemini-2.5-flash` (20 requests/day/model on the free tier, confirmed by a
+live 429 in production, Aug 2026). `gemini-2.5-flash-lite` reportedly has a
+much higher free-tier daily cap (order of 1,000/day) for the same
+sentiment/reply task, which is simple enough that the lighter model handles
+it fine — the safety guardrails below don't depend on model quality, they're
+enforced in code regardless of what the model returns. Switching is a Vercel
+env var change, no code required; verify the current number on the Gemini
+API pricing/rate-limit page before relying on it, since Google has changed
+free-tier quotas more than once (a 50-80% cut in Dec 2025 is why the 20/day
+number above is lower than older docs suggest).
 
 ### Safety guardrails — do not loosen without asking
 
