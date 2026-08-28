@@ -88,6 +88,12 @@ export async function GET(req: NextRequest) {
 
       if (itemsError || !items || items.length === 0) continue;
 
+      console.log(
+        `[cron/flush-comments] client ${client.name} (${client.id}): ${items.length} pending item(s) — ${items
+          .map((i) => i.external_id)
+          .join(", ")}`
+      );
+
       const analyses = await analyzeCommentsBatch(
         items.map((c) => ({ id: c.external_id, text: c.text })),
         client.ai_instructions
@@ -95,6 +101,9 @@ export async function GET(req: NextRequest) {
 
       for (const item of items) {
         const analysis = analyses.get(item.external_id)!;
+        console.log(
+          `[cron/flush-comments] ${item.external_id}: sentiment=${analysis.sentiment} shouldAutoReply=${analysis.shouldAutoReply}`
+        );
 
         try {
           if (analysis.shouldAutoReply && analysis.reply && client.meta_page_access_token) {

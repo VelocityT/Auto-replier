@@ -60,6 +60,18 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleCommentEvent(event: ReturnType<typeof parseWebhookEvents>[number]) {
+  // Unconditional trace — every event Meta sends, logged before any filter
+  // has a chance to drop it. Added after a comment (brajrajhospital
+  // "Wonderful") vanished with zero trace: the webhook returned 200, but
+  // nothing showed up in processed_items, flagged_items, or pending_comments,
+  // and every other log line in this function only fires on a specific
+  // branch (skip / not-found / error) — there was no way to tell which
+  // branch even ran. This line always fires, so the next unexplained drop
+  // is debuggable from logs alone instead of guessing.
+  console.log(
+    `[meta webhook] event received: platform=${event.platform} pageOrAccountId=${event.pageOrAccountId} authorId=${event.authorId} authorName=${event.authorName} commentId=${event.commentId}`
+  );
+
   // Look up which client this page/IG account belongs to.
   const column = event.platform === "instagram" ? "meta_ig_account_id" : "meta_page_id";
 
@@ -71,9 +83,11 @@ async function handleCommentEvent(event: ReturnType<typeof parseWebhookEvents>[n
     .maybeSingle<ClientConfig>();
 
   if (error || !client) {
-    console.warn(`[meta webhook] no active client found for ${column}=${event.pageOrAccountId}`);
+    console.warn(`[meta webhook] no active client found for ${column}=${event.pageOrAccountId}`, error ?? "");
     return;
   }
+
+  console.log(`[meta webhook] matched client=${client.name} (${client.id})`);
 
   // Skip comments posted by the connected account itself. Posting a reply is
   // *also* a comment, and this account is subscribed to the `comments` field
@@ -106,7 +120,10 @@ async function handleCommentEvent(event: ReturnType<typeof parseWebhookEvents>[n
     .eq("external_id", event.commentId)
     .maybeSingle();
 
-  if (existing) return;
+  if (existing) {
+    console.log(`[meta webhook] comment ${event.commentId} already in processed_items, skipping`);
+    return;
+  }
 
   // Don't call the AI here — just enqueue. Gemini's free tier is 20
   // requests/day/model, so one call per incoming comment falls over well
@@ -129,5 +146,7 @@ async function handleCommentEvent(event: ReturnType<typeof parseWebhookEvents>[n
 
   if (enqueueError) {
     console.error(`[meta webhook] failed to enqueue comment ${event.commentId}`, enqueueError);
+  } else {
+    console.log(`[meta webhook] enqueued comment ${event.commentId} for client ${client.name}`);
   }
 }
