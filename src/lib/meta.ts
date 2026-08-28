@@ -10,6 +10,7 @@ export interface MetaCommentEvent {
   pageOrAccountId: string; // IG business account ID or FB Page ID — used to look up the client
   commentId: string;
   text: string;
+  authorId: string | null; // from.id — used to detect the connected account replying to itself
   authorName: string | null;
   // The post/media this comment was left on, when Meta includes it in the
   // webhook payload. Used for the "which post got comments" dashboard view.
@@ -84,6 +85,7 @@ export function parseWebhookEvents(payload: any): MetaCommentEvent[] {
           pageOrAccountId: entry.id, // IG business account ID
           commentId: change.value.id,
           text: change.value.text,
+          authorId: change.value.from?.id ?? null,
           authorName: change.value.from?.username ?? null,
           postRef: mediaId
             ? { id: mediaId, label: "Instagram post", url: null }
@@ -105,6 +107,7 @@ export function parseWebhookEvents(payload: any): MetaCommentEvent[] {
           pageOrAccountId: entry.id, // FB Page ID
           commentId: change.value.comment_id,
           text: change.value.message,
+          authorId: change.value.from?.id ?? null,
           authorName: change.value.from?.name ?? null,
           postRef: postId
             ? { id: postId, label: "Facebook post", url: `https://www.facebook.com/${postId}` }

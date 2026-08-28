@@ -76,6 +76,28 @@ async function handleCommentEvent(event: ReturnType<typeof parseWebhookEvents>[n
     return;
   }
 
+  // Skip comments posted by the connected account itself. Posting a reply is
+  // *also* a comment, and this account is subscribed to the `comments` field
+  // on its own posts — so every auto-reply we send generates a brand new
+  // webhook event that looks exactly like an incoming comment. Without this
+  // check the app analyzes its own reply, decides it's a nice positive
+  // message, and replies to itself again — a self-sustaining loop that only
+  // ever stopped in production because the Gemini free-tier daily quota ran
+  // out (confirmed live, Aug 2026: ~10 near-identical "Thank you for your
+  // kind words..." replies stacked on one comment before the 429s started).
+  const isSelfComment =
+    (event.authorId && event.authorId === client.meta_ig_account_id) ||
+    (event.authorName &&
+      client.meta_ig_username &&
+      event.authorName.toLowerCase() === client.meta_ig_username.toLowerCase());
+
+  if (isSelfComment) {
+    console.info(
+      `[meta webhook] skipping self-authored comment ${event.commentId} (from connected account, not a real customer)`
+    );
+    return;
+  }
+
   // Skip if we've already processed this comment (Meta can send duplicates).
   const { data: existing } = await supabase
     .from("processed_items")

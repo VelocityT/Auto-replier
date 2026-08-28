@@ -120,6 +120,41 @@ dashboard work before real client accounts can connect:
    be published before webhooks deliver.
 5. `INSTAGRAM_APP_SECRET` must be added to Vercel env (never committed).
 
+## Recently fixed (Aug 2026, cont'd)
+
+- **Self-reply infinite loop (confirmed live, caused real duplicate public
+  replies).** Posting an auto-reply is *itself* a new Instagram comment, and
+  the connected account is subscribed to its own `comments` field — so every
+  reply the app posted generated a fresh webhook event indistinguishable from
+  a real incoming comment. The app analyzed its own reply, decided it was a
+  nice positive message, and replied to itself again, repeatedly. Live
+  evidence on shree medicare / @velocitytech.in: ~10 near-duplicate "Thank you
+  for your kind words..." replies stacked under one real customer comment.
+  It only stopped because the Gemini free-tier daily quota (20
+  requests/model/day) ran out. Fixed in `src/app/api/webhooks/meta/route.ts`:
+  `handleCommentEvent` now skips any event whose `authorId`/`authorName`
+  matches the client's own `meta_ig_account_id`/`meta_ig_username` before
+  doing anything else. `parseWebhookEvents` in `meta.ts` now also captures
+  `from.id` (previously only `from.username`/`from.name`) so the ID check is
+  possible.
+- **AI failures other than bad JSON were silently dropping comments.**
+  `analyzeComment()` only caught `JSON.parse` errors; a thrown error from
+  `generateContent()` itself (429 quota exceeded, network blip, Gemini 5xx)
+  propagated out of the function entirely, past the webhook route's
+  try/catch, and the comment was never flagged, never replied, never
+  logged anywhere useful — a silent drop. Confirmed live: real negative
+  reviews ("Very bad service") vanished this way during the quota exhaustion
+  above, instead of reaching the Review Queue like CLAUDE.md's own
+  guardrail #3 promises. Fixed by wrapping the whole Gemini call (not just
+  the parse step) in one try/catch in `src/lib/ai.ts` — any failure now takes
+  the same fail-safe path as malformed output.
+- **Operational note:** the Gemini free tier is 20 requests/day/model. That's
+  fine for the batched cron routes (YouTube/GBP — one call per client per
+  run) but tight for the per-comment Instagram webhook path once a client has
+  real engagement. Worth moving to a paid Gemini tier before onboarding more
+  than a couple of active Instagram clients, independent of the loop bug
+  above (which was the main thing eating quota this time).
+
 ## Known issues / open work
 
 Ordered by how badly they bite.

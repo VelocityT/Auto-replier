@@ -92,25 +92,35 @@ export async function analyzeComment(
     clientInstructions || "No specific instructions provided. Be polite, professional, and concise."
   );
 
-  const result = await model.generateContent([
-    { text: systemPrompt },
-    { text: `Comment to analyze:\n"""${commentText}"""` },
-  ]);
-
-  const raw = result.response.text();
-
+  // Everything below — not just the JSON.parse — is wrapped in one try/catch.
+  // Originally only malformed JSON was caught here; a thrown error from
+  // generateContent() itself (429 quota exceeded, network blip, Gemini 5xx)
+  // propagated straight out of this function, past the webhook route's outer
+  // catch, and the comment was silently dropped — never flagged, never
+  // replied. Confirmed live (Aug 2026): a Gemini free-tier quota exhaustion
+  // (20 requests/day) caused exactly this on real negative reviews ("Very bad
+  // service"), which just vanished instead of reaching the Review Queue.
+  // Any failure now — parse or API-level — takes the same fail-safe path as
+  // malformed output: flagged for a human, never auto-posted, never dropped.
+  let raw = "";
   let parsed: AiAnalysis;
   try {
+    const result = await model.generateContent([
+      { text: systemPrompt },
+      { text: `Comment to analyze:\n"""${commentText}"""` },
+    ]);
+    raw = result.response.text();
     parsed = JSON.parse(raw) as AiAnalysis;
   } catch (err) {
-    // Fail safe: if the model ever returns malformed JSON, never auto-reply.
     return {
       language: "other",
       sentiment: "negative",
       intent: "other",
       shouldAutoReply: false,
       reply: "",
-      reasoning: `AI returned unparsable response, flagged for manual review. Raw: ${raw.slice(0, 200)}`,
+      reasoning: `AI call failed or returned unparsable response, flagged for manual review. ${
+        raw ? `Raw: ${raw.slice(0, 200)}` : String(err).slice(0, 200)
+      }`,
     };
   }
 
