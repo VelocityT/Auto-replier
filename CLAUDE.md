@@ -134,19 +134,119 @@ Instagram replies go to `graph.instagram.com`, Facebook Page replies go to
 | Production URL | `https://auto-replier.vercel.app` |
 | Vercel project | `auto-replier` (`prj_hjwHwr9pxA9YtYhfgJc6GOH23boU`) |
 
-**Meta App Review for `instagram_business_*` is APPROVED.** Remaining
-dashboard work before real client accounts can connect:
+**Dashboard checklist status as of Aug 28 2026 (verified directly in the Meta
+Instagram API use case, not just from memory):** app Publish status =
+**Published**, step 2 (generate access tokens), step 3 (configure webhooks —
+callback URL + verify token + `comments`/`live_comments` subscribed) and step
+4 (Instagram business login redirect URI) all show **green/complete**. Steps
+1-4 of the old checklist below are DONE — do not re-do them. `INSTAGRAM_APP_SECRET`
+is set in Vercel env.
 
-1. App is still **Unpublished / In development** → Dashboard → Publish.
-2. **Business verification** is not green — usually gates publishing.
-3. **Instagram business login is not set up** (API setup with Instagram login,
-   step 4). Redirect URI must be
-   `https://auto-replier.vercel.app/api/oauth/meta/callback`.
-4. **Webhook callback URL is blank** (step 3). Set to
-   `https://auto-replier.vercel.app/api/webhooks/meta` with the
-   `META_VERIFY_TOKEN` value, subscribe to `comments`. Meta requires the app to
-   be published before webhooks deliver.
-5. `INSTAGRAM_APP_SECRET` must be added to Vercel env (never committed).
+**The actual, currently-confirmed blocker is step 5: "Complete app review" for
+the Instagram API use case shows incomplete (blue, not green) — this is a
+*different, narrower* review than the general "Meta App Review" badge
+referenced elsewhere in this doc, and it gates Advanced Access specifically
+for `instagram_business_basic` / `instagram_business_manage_comments` /
+`instagram_business_manage_messages`.** Without Advanced Access, Instagram
+only delivers webhook events (comments, etc.) for accounts that hold a role
+on the app (Administrator / Developer / Tester) — confirmed via
+Dashboard → App roles → Roles, which lists exactly two entries: `Ufaq Haider`
+(Administrator) and `velocitytech.in` (**Instagram Tester**). That's why every
+webhook-driven diagnosis so far (self-reply loop, ID mismatch) worked: the
+connected account itself is a Tester, so its own actions (posting, replying)
+generate real webhook events. A random public commenter (brajrajhospital,
+brainyacademylko, connate1, ufaq.pvt, or any real hospital/school patient —
+none of whom have a role on this app) generates **zero** webhook event, ever,
+confirmed via Vercel `get_runtime_logs`: in a 24h window, `requestPath`
+group-by shows **only** `/api/cron/flush-comments` hits (the scheduled cron)
+— not one single request, successful or failed, ever reached
+`/api/webhooks/meta`. This is not a code bug and none of this session's code
+fixes (self-loop guard, ID-mismatch patch, batching, AI fail-safe) can work
+around it, because the event never arrives at the server to begin with.
+
+**Update, checked directly on the App Review submissions page (not just the
+use-case checklist icon):** it was already submitted once — Aug 11, 2026 —
+and **rejected**. All four permissions (`instagram_business_basic`,
+`instagram_business_manage_messages`, `instagram_business_manage_insights`,
+`instagram_business_manage_comments`) show a red "Not approved" badge. The
+current submission tray is empty ("Not submitted — nothing has been added to
+this submission yet") — nothing has been resubmitted since the Aug 11
+rejection. So this isn't "pending Meta" — it's stalled on our side waiting
+for a resubmission with fixes. Haven't yet pulled the specific rejection
+feedback text (the "View request details" panel didn't render via automated
+browsing) — do that manually in the dashboard (App Review → Previous
+submissions → View request details) before resubmitting, since Meta usually
+gives a specific reason (e.g. screencast/demo video not showing the exact
+permission's use, privacy policy not addressing Instagram data use, use case
+description too vague) and resubmitting blind risks a second rejection.
+
+**Update — actual rejection feedback read (submitted Jul 31 2026, not Aug 11 as
+first assumed; timestamps in the dashboard list multiple submission attempts):**
+
+- `instagram_business_basic` — **Disallowed Use Case** (Developer Policy 1.6):
+  Meta says the use case for this permission is invalid / not needed for core
+  functionality.
+- `instagram_business_manage_messages` — **Screencast Not Aligned**. Reviewer
+  note: *"the screencast does not show a message being sent from your app UI
+  and the same message appearing in the native client... re-record showing
+  (1) asset selection, (2) a live send action from your app, (3) the
+  delivered message in the native client."*
+- `instagram_business_manage_insights` — **Screencast Not Aligned** (generic
+  template reason, no specific reviewer note).
+- `instagram_business_manage_comments` — **Screencast Not Aligned** (generic
+  template reason, no specific reviewer note).
+
+**Root cause of all four rejections, confirmed by reading the actual code:**
+this app has never had a DM-sending feature or an insights/analytics feature.
+Grepped the whole `src/` tree for `manage_messages`/`manage_insights` usage —
+zero hits. The only things the app does are (1) look up the connected
+account's own id/username via `instagram_business_basic` (`getInstagramAccount`
+in `meta.ts`, used to detect and skip self-authored comments) and (2) read +
+reply to comments via `instagram_business_manage_comments`
+(`replyToComment`, the webhook `comments` field). `manage_messages` and
+`manage_insights` were being requested anyway because
+`META_OAUTH_SCOPES` in `meta.ts` listed all four — there was never a real
+screen to record for the messaging/insights screencasts because the feature
+doesn't exist, which is exactly why those two got rejected, and requesting
+them likely diluted the `basic` justification enough to get it rejected too
+("not needed to support its core functionality" — true, for those two).
+
+**Fixed in code (this session):** `META_OAUTH_SCOPES` in `src/lib/meta.ts` now
+only requests `instagram_business_basic` + `instagram_business_manage_comments`
+— the two scopes the app actually uses. `instagram_business_manage_messages`
+and `instagram_business_manage_insights` were removed. This needs a matching
+change on the Meta side before resubmitting: Dashboard → Use cases →
+Instagram API → Permissions and features → remove/don't include
+`manage_messages` and `manage_insights` from the next App Review submission
+(only submit `basic` + `manage_comments`).
+
+**Resubmission checklist:**
+1. On the Meta dashboard, submit only `instagram_business_basic` and
+   `instagram_business_manage_comments`.
+2. For `instagram_business_basic`'s use-case notes, explicitly tie it to
+   `manage_comments` — it's a hard dependency (needed to fetch the connected
+   account's own id/username so the app can tell its own auto-replies apart
+   from real customer comments and avoid a reply-to-self loop), not a
+   standalone feature. Don't describe messaging or insights anywhere in the
+   notes.
+3. Record ONE new screencast covering the real, only end-to-end flow: (a) the
+   full Instagram Login OAuth consent screen showing exactly these two
+   permissions being granted, (b) a real comment posted on the connected
+   account's Instagram post, (c) the app's webhook → AI classification →
+   auto-reply happening (dashboard or logs showing it, plus (d) switching to
+   the native Instagram app/web to show the reply actually posted under the
+   comment. English UI, narrate/caption what each screen is doing per Meta's
+   screencast guide. This app uses standard per-user OAuth (Instagram Login),
+   not a system user token — say so explicitly if the reviewer might mistake
+   the cron-driven YouTube/GBP polling elsewhere in the app for a server-to-
+   server flow.
+4. Until this resubmission is approved, comments from accounts that aren't
+   Admin/Developer/Tester on this app will never trigger a webhook, no matter
+   what the code does — confirmed via Vercel logs (zero requests ever reached
+   `/api/webhooks/meta` in a 24h window). As a controlled-testing-only
+   stopgap (does NOT scale to real customers), additional specific test
+   accounts can be added under App roles → Testers so their comments generate
+   webhooks pre-approval.
 
 ## Recently fixed (Aug 2026, cont'd)
 
@@ -246,8 +346,13 @@ Ordered by how badly they bite.
 
 ## Pending external approvals
 
-- **Meta App Review** — ✅ APPROVED. See the "Meta app identifiers" section for
-  the remaining dashboard steps (publish, verification, login + webhook setup).
+- **Meta App Review for Instagram Advanced Access (`instagram_business_basic`,
+  `instagram_business_manage_comments`, `instagram_business_manage_messages`)
+  — NOT submitted/approved.** This is the actual current blocker for real
+  customer comments reaching the app at all — see the "Meta app identifiers"
+  section for the full diagnosis (confirmed Aug 28 2026 via the Meta dashboard
+  + Vercel runtime logs). Everything else in that checklist (publish, webhook
+  config, Instagram login setup) is done.
 - **GBP API access** — case 7-5896000040841. Account/location listing may be
   granted before review read/reply. The cron skips clients without
   `gbp_account_id` + `gbp_location_id`.

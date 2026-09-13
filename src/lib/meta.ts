@@ -187,11 +187,27 @@ export const INSTAGRAM_GRAPH_BASE = "https://graph.instagram.com/v23.0";
 
 // Scopes needed to read + reply to comments on the client's Instagram
 // Business account. Must stay in sync with the Meta App Review submission.
+//
+// Deliberately just these two. The app was rejected Jul 31 2026 requesting
+// four scopes: instagram_business_basic was rejected as "invalid use case /
+// not needed for core functionality" (Developer Policy 1.6), and
+// instagram_business_manage_messages / instagram_business_manage_insights
+// were rejected because the screencast couldn't show a real end-to-end use
+// of them -- for the simple reason that this app has no DM-sending feature
+// and no insights/analytics feature. Nothing in this codebase ever calls a
+// messages or insights endpoint. Requesting scopes the app doesn't use is
+// itself what sank the `basic` justification (the submission notes had to
+// cover messaging + insights too, diluting the actual comment-reply use
+// case), so drop both and only request what auto-reply genuinely needs:
+// `basic` to resolve the connected account's own id/username (required to
+// detect and skip self-authored comments -- see handleCommentEvent in
+// src/app/api/webhooks/meta/route.ts) and `manage_comments` to read and
+// reply to comments. If DM auto-reply or an insights dashboard becomes a
+// real feature later, add the scope back only once there's an actual
+// screen to record for it.
 export const META_OAUTH_SCOPES = [
   "instagram_business_basic",
   "instagram_business_manage_comments",
-  "instagram_business_manage_messages",
-  "instagram_business_manage_insights",
 ].join(",");
 
 /**
