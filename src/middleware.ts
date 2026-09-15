@@ -1,39 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE, isValidSessionToken } from "@/lib/auth";
 
-// Gate the entire app behind a simple password. This protects the review
-// queue, dashboard, and admin client-management screens — all internal
-// tools that should only be used by Velocity Tech staff.
+// Auth gate DISABLED (Sep 2026, at owner's request) — every route, including
+// the dashboard, review queue, and admin client-management screens, is now
+// open with no password. This was previously gated behind SESSION_COOKIE /
+// isValidSessionToken (see src/lib/auth.ts and src/app/login/ — both still
+// present, just unused) because those screens can approve/reject AI replies,
+// disconnect a client's Instagram/YouTube/GBP connection, and start new
+// OAuth connect flows for real client accounts.
 //
-// NOT gated (must stay open for external callers):
-//   /login                — the login page itself
-//   /api/auth/*           — login/logout endpoints
-//   /api/cron/*           — polled by cron-job.org with its own ?secret=
-//   /api/webhooks/*        — called by Meta with its own signature check
-//   _next/static, favicon  — framework assets
+// Risk this removes protection against: anyone with the production URL can
+// now do all of that with no login. `toSafeClient()` in src/lib/clients.ts
+// still strips access/refresh tokens before anything reaches the browser,
+// so credentials themselves are not exposed — but the admin actions above
+// are. If this ever needs to be re-enabled, restore the body of this file
+// from git history (the auth check + redirect-to-/login logic) — nothing
+// else needs to change, /login and /api/auth/* were left in place.
 //
-// /api/oauth/* is intentionally NOT public — the admin must be logged in
-// (with the session cookie) to start a connect flow, and the browser keeps
-// that cookie through the Google/Meta redirect dance.
+// /api/cron/* and /api/webhooks/* were always public regardless (own
+// ?secret= / signature checks).
 
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/cron", "/api/webhooks"];
-
-export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
-    return NextResponse.next();
-  }
-
-  const token = req.cookies.get(SESSION_COOKIE)?.value;
-  const valid = await isValidSessionToken(token);
-
-  if (!valid) {
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("from", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
+export async function middleware(_req: NextRequest) {
   return NextResponse.next();
 }
 
